@@ -1,0 +1,1125 @@
+<!doctype html><meta charset="utf-8">
+<style>html,body{margin:0;background:#000}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const Q = new URLSearchParams(location.search);
+const log = (s) => fetch('/log', { method: 'POST', body: String(s) });   // returns a promise
+window.onerror = (m, src, l, c, e) => { log('ERROR ' + m + ' @' + l + ':' + c + ' ' + (e && e.stack)); fetch('/done', { method: 'POST' }); };
+window.addEventListener('unhandledrejection', (ev) => { log('REJECT ' + (ev.reason && (ev.reason.stack || ev.reason))).then(() => fetch('/done', { method: 'POST' })); });
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+// ---------------- renderer / scene ----------------
+const OUT = Number(Q.get('size') || 360), SS = 2;           // output px, supersampling
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(OUT * SS, OUT * SS);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x000000);
+
+scene.add(new THREE.HemisphereLight(0xd6d8dc, 0x000000, 0.5));
+const key = new THREE.DirectionalLight(0xfff4e8, 2.7); key.position.set(1.6, 3.6, 2.4); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048); Object.assign(key.shadow.camera, { left: -1.6, right: 1.6, top: 1.6, bottom: -1.6, near: 0.5, far: 9 });
+key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02; scene.add(key);
+const rim = new THREE.DirectionalLight(0xe4e9f2, 2.1); rim.position.set(-2.4, 2.2, -2.8); scene.add(rim);
+const rim2 = new THREE.DirectionalLight(0xffffff, 0.9); rim2.position.set(2.8, 1.2, -2.2); scene.add(rim2);
+
+// floor: soft spotlight pool so the figure is grounded on black
+function poolTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(256, 256, 0, 256, 256, 256);
+  gr.addColorStop(0, '#222224'); gr.addColorStop(0.5, '#111112'); gr.addColorStop(1, '#000000');
+  g.fillStyle = gr; g.fillRect(0, 0, 512, 512);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const floor = new THREE.Mesh(new THREE.CircleGeometry(1.9, 64), new THREE.MeshBasicMaterial({ map: poolTexture() }));
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const shadowCatcher = new THREE.Mesh(new THREE.CircleGeometry(1.9, 64), new THREE.ShadowMaterial({ opacity: 0.55 }));
+shadowCatcher.rotation.x = -Math.PI / 2; shadowCatcher.position.y = 0.001; shadowCatcher.receiveShadow = true; scene.add(shadowCatcher);
+
+// ---------------- materials / equipment ----------------
+const M = {
+  steel: new THREE.MeshStandardMaterial({ color: 0xb8bcc4, metalness: 0.95, roughness: 0.28 }),
+  dark: new THREE.MeshStandardMaterial({ color: 0x1b1b1e, metalness: 0.6, roughness: 0.45 }),
+  rubber: new THREE.MeshStandardMaterial({ color: 0x151517, metalness: 0.05, roughness: 0.72 }),
+  rubberEdge: new THREE.MeshStandardMaterial({ color: 0x2a2a2e, metalness: 0.1, roughness: 0.6 }),
+  leather: new THREE.MeshStandardMaterial({ color: 0x232327, metalness: 0.05, roughness: 0.55 }),
+  frame: new THREE.MeshStandardMaterial({ color: 0x26272b, metalness: 0.25, roughness: 0.6 }),
+};
+function shadowed(o) { o.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; }
+function cyl(r, h, mat, seg = 32) { return new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat); }
+function roundedBox(w, h, d, r, mat) {
+  const s = new THREE.Shape(), x = -w / 2, y = -d / 2;
+  s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + d - r);
+  s.quadraticCurveTo(x + w, y + d, x + w - r, y + d); s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r);
+  s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+  const g = new THREE.ExtrudeGeometry(s, { depth: h - 0.02, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 3, curveSegments: 6 });
+  g.rotateX(Math.PI / 2); g.translate(0, h / 2, 0);
+  return new THREE.Mesh(g, mat);
+}
+function barbell(plateR = 0.225) {          // along X, centred at origin
+  const g = new THREE.Group();
+  const bar = cyl(0.0145, 2.05, M.steel); bar.rotation.z = Math.PI / 2; g.add(bar);
+  for (const s of [-1, 1]) {
+    const sleeve = cyl(0.025, 0.38, M.steel); sleeve.rotation.z = Math.PI / 2; sleeve.position.x = s * 0.83; g.add(sleeve);
+    const collar = cyl(0.034, 0.03, M.steel); collar.rotation.z = Math.PI / 2; collar.position.x = s * 0.64; g.add(collar);
+    for (let i = 0; i < 2; i++) {
+      const p = cyl(plateR - i * 0.03, 0.045, M.rubber, 48); p.rotation.z = Math.PI / 2; p.position.x = s * (0.685 + i * 0.05); g.add(p);
+      const rim_ = new THREE.Mesh(new THREE.TorusGeometry(plateR - i * 0.03 - 0.008, 0.008, 8, 48), M.rubberEdge);
+      rim_.rotation.y = Math.PI / 2; rim_.position.x = p.position.x + s * 0.023; g.add(rim_);
+    }
+  }
+  return shadowed(g);
+}
+function dumbbell() {                        // along X, centred at origin
+  const g = new THREE.Group();
+  const h = cyl(0.016, 0.16, M.steel); h.rotation.z = Math.PI / 2; g.add(h);
+  for (const s of [-1, 1]) {
+    const head = cyl(0.058, 0.075, M.rubber, 6); head.rotation.z = Math.PI / 2; head.rotation.x = Math.PI / 6; head.position.x = s * 0.118; g.add(head);
+    const cap = cyl(0.03, 0.02, M.steel); cap.rotation.z = Math.PI / 2; cap.position.x = s * 0.163; g.add(cap);
+  }
+  return shadowed(g);
+}
+function flatBench(z0, z1, topY = 0.44) {    // pad along Z
+  const g = new THREE.Group(), len = z1 - z0;
+  const pad = roundedBox(0.29, 0.085, len, 0.035, M.leather); pad.position.set(0, topY - 0.0425, (z0 + z1) / 2); g.add(pad);
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, len - 0.12), M.frame); rail.position.set(0, topY - 0.11, (z0 + z1) / 2); g.add(rail);
+  for (const z of [z0 + 0.12, z1 - 0.12]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, topY - 0.13, 0.06), M.frame); leg.position.set(0, (topY - 0.13) / 2, z); g.add(leg);
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.07), M.frame); foot.position.set(0, 0.02, z); g.add(foot);
+  }
+  return shadowed(g);
+}
+
+// ---------------- character + rig ----------------
+const R = {};          // rig: bones + rest data
+let char, skinned;
+async function loadChar() {
+  const g = await new GLTFLoader().loadAsync('man.glb');
+  char = g.scene; scene.add(char);
+  char.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; skinned = o; } if (o.isBone) R[o.name] = o; });
+  char.updateMatrixWorld(true);
+  R.rest = {};
+  for (const n in R) if (R[n].isBone) R.rest[n] = { q: R[n].quaternion.clone(), p: R[n].position.clone(), wp: R[n].getWorldPosition(V()), wq: R[n].getWorldQuaternion(new THREE.Quaternion()) };
+  const rp = (n) => R.rest[n].wp;
+  // limb rest frames: direction + hinge axis (cross of the two segment directions at rest)
+  R.limb = {};
+  for (const [side, up, lo, end] of [['L', 'LeftArm', 'LeftForeArm', 'LeftHand'], ['R', 'RightArm', 'RightForeArm', 'RightHand'],
+                                    ['LL', 'LeftUpLeg', 'LeftLeg', 'LeftFoot'], ['RL', 'RightUpLeg', 'RightLeg', 'RightFoot']]) {
+    const d1 = rp(lo).clone().sub(rp(up)), d2 = rp(end).clone().sub(rp(lo));
+    R.limb[side] = { up, lo, end, a: d1.length(), b: d2.length(), d1: d1.clone().normalize(), d2: d2.clone().normalize(), n: d1.clone().cross(d2).normalize() };
+  }
+  for (const [f, t] of [['LeftFoot', 'LeftToeBase'], ['RightFoot', 'RightToeBase']]) {
+    const d = rp(t).clone().sub(rp(f)).normalize();
+    R.limb[f] = { d, u: V(0, 1, 0).sub(d.clone().multiplyScalar(d.y)).normalize() };
+  }
+  R.hand = {
+    L: { d: V(0.15, -0.98, -0.11).normalize(), n: V(-0.88, -0.08, -0.46).normalize() },
+    R: { d: V(-0.2, -0.98, -0.1).normalize(), n: V(0.89, -0.14, -0.45).normalize() },
+  };
+  curlFingers();
+  setupMuscles();
+}
+
+// The model has no finger bones, so the hands would stay flat. Bend the finger part of each hand mesh
+// (beyond the knuckle line) around an axis across the palm, like a bend deformer, into a grip.
+const GRIP = { du: 0.11, dv: 0.02 };
+function curlFingers() {
+  const g = skinned.geometry, pos = g.attributes.position, nor = g.attributes.normal, si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
+  const sk = skinned.skeleton, bones = sk.bones;
+  skinned.updateMatrixWorld(true); sk.update();
+  // per-bone skinning matrices at rest: bone.matrixWorld * boneInverse
+  const BM = bones.map((b, i) => new THREE.Matrix4().multiplyMatrices(b.matrixWorld, sk.boneInverses[i]));
+  const pre = new THREE.Matrix4().multiplyMatrices(skinned.matrixWorld, skinned.bindMatrixInverse);
+  function vertexMatrix(i) {          // raw local position → rest world position, for this vertex
+    const m = new THREE.Matrix4().set(0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0);
+    const ids = [si.getX(i), si.getY(i), si.getZ(i), si.getW(i)], ws = [sw.getX(i), sw.getY(i), sw.getZ(i), sw.getW(i)];
+    for (let k = 0; k < 4; k++) if (ws[k] > 0) { const e = BM[ids[k]].elements; for (let j = 0; j < 16; j++) m.elements[j] += e[j] * ws[k]; }
+    return new THREE.Matrix4().multiplyMatrices(pre, m.multiply(skinned.bindMatrix));
+  }
+  for (const side of ['L', 'R']) {
+    const bn = side === 'L' ? 'LeftHand' : 'RightHand', bi = bones.findIndex((b) => b.name === bn), H = R.hand[side];
+    const W = R.rest[bn].wp, d = H.d, n = H.n, a = d.clone().cross(n).normalize();
+    const idx = []; let tip = 0;
+    for (let i = 0; i < pos.count; i++) {
+      let best = -1, bw = 0;
+      const ids = [si.getX(i), si.getY(i), si.getZ(i), si.getW(i)], ws = [sw.getX(i), sw.getY(i), sw.getZ(i), sw.getW(i)];
+      for (let k = 0; k < 4; k++) if (ws[k] > bw) { bw = ws[k]; best = ids[k]; }
+      if (best !== bi) continue;
+      const M = vertexMatrix(i), P = V().fromBufferAttribute(pos, i).applyMatrix4(M);
+      tip = Math.max(tip, P.clone().sub(W).dot(d)); idx.push([i, M, P]);
+    }
+    const K = tip - 0.092;                                // knuckle line
+    // finger span (from fingertip vertices) — anything outside it is the thumb
+    const tipW = idx.filter(([, , P]) => P.clone().sub(W).dot(d) - K > 0.055).map(([, , P]) => P.clone().sub(W).dot(a)).sort((x, y) => x - y);
+    const w0 = tipW[Math.floor(tipW.length * 0.03)], w1 = tipW[Math.floor(tipW.length * 0.97)], wc = (w0 + w1) / 2;
+    const fv = idx.filter(([, , P]) => P.clone().sub(W).dot(d) - K > 0.01).map(([, , P]) => P.clone().sub(W).dot(n));
+    const vc = fv.reduce((x, y) => x + y, 0) / fv.length;  // finger centre line (palm-normal offset)
+    // joints along the finger: knuckle (MCP), middle (PIP), tip (DIP): [position beyond knuckle, angle]
+    const J = [[0.0, 68], [0.044, 96], [0.071, 48]].map(([u, deg]) => [u, deg * Math.PI / 180]);
+    const smoothJ = (e, x) => { const t = Math.min(1, Math.max(0, (x - (e - 0.007)) / 0.014)); return t * t * (3 - 2 * t); };
+    let moved = 0; const curled = [];
+    for (const [i, M, P] of idx) {
+      const rel = P.clone().sub(W), u = rel.dot(d) - K;
+      if (u <= -0.007) continue;
+      let w = rel.dot(a);
+      const thumb = w < w0 - 0.01 || w > w1 + 0.01, amt = thumb ? 0.3 : 1;
+      // rotate the (u, v) profile point about each joint, distal first
+      let pu = u, pv = rel.dot(n), totalAng = 0;
+      for (let jj = J.length - 1; jj >= 0; jj--) {
+        const [uj, ang] = J[jj], f = smoothJ(uj, u) * ang * amt;
+        if (f <= 0) continue;
+        const pivV = vc + 0.007, du = pu - uj, dv = pv - pivV;
+        pu = uj + du * Math.cos(f) - dv * Math.sin(f); pv = pivV + du * Math.sin(f) + dv * Math.cos(f);
+        totalAng += f;
+      }
+      if (!thumb) w = wc + (w - wc) * (1 - 0.22 * Math.min(1, Math.max(0, u / 0.03)));
+      const np = W.clone().add(d.clone().multiplyScalar(K + pu)).add(n.clone().multiplyScalar(pv)).add(a.clone().multiplyScalar(w));
+      if (!thumb && u > 0.03) curled.push(np.clone());
+      const Mi = M.clone().invert(); np.applyMatrix4(Mi); pos.setXYZ(i, np.x, np.y, np.z);
+      if (totalAng > 0) {
+        const nmF = new THREE.Matrix3().getNormalMatrix(M), nmB = new THREE.Matrix3().getNormalMatrix(Mi);
+        const q = V().fromBufferAttribute(nor, i).applyMatrix3(nmF).normalize().applyAxisAngle(a, -totalAng).applyMatrix3(nmB).normalize();
+        nor.setXYZ(i, q.x, q.y, q.z);
+      }
+      moved++;
+    }
+    // grip centre: midway between the palm (at the knuckles) and the curled fingertips, in hand coordinates
+    const cc = curled.reduce((x, y) => x.add(y), V()).multiplyScalar(1 / curled.length).sub(W);
+    GRIP.du = (cc.dot(d) + K + 0.005) / 2 + 0.006; GRIP.dv = (cc.dot(n) + vc) / 2 + 0.004;
+  }
+  pos.needsUpdate = true; nor.needsUpdate = true;
+}
+
+const _m1 = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _q = new THREE.Quaternion();
+function basis(d, n) { const x = d.clone().normalize(), y = n.clone().sub(x.clone().multiplyScalar(n.dot(x))).normalize(), z = x.clone().cross(y); return new THREE.Matrix4().makeBasis(x, y, z); }
+// orient bone so its rest (dir, axis) maps onto (dir, axis) in world space
+function setWorldFrame(bone, restWq, restD, restN, d, n) {
+  const R_ = basis(d, n).multiply(basis(restD, restN).transpose());
+  const wq = new THREE.Quaternion().setFromRotationMatrix(R_).multiply(restWq);
+  bone.parent.updateMatrixWorld(true);
+  const pq = bone.parent.getWorldQuaternion(new THREE.Quaternion());
+  bone.quaternion.copy(pq.invert().multiply(wq));
+  bone.updateMatrixWorld(true);
+}
+// two-bone IK: root fixed, target for the end joint, pole = direction the middle joint points
+function solveLimb(side, target, pole) {
+  const L = R.limb[side], up = R[L.up], lo = R[L.lo];
+  up.parent.updateMatrixWorld(true);
+  const S = up.getWorldPosition(V()), a = L.a, b = L.b;
+  let dv = target.clone().sub(S), d = dv.length();
+  d = Math.min(Math.max(d, Math.abs(a - b) + 1e-3), a + b - 1e-3);
+  const u = dv.normalize(), p = pole.clone().sub(u.clone().multiplyScalar(pole.dot(u))).normalize();
+  const x = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - x * x));
+  const E = S.clone().add(u.clone().multiplyScalar(x)).add(p.clone().multiplyScalar(h));
+  const T = S.clone().add(u.clone().multiplyScalar(d));
+  const d1 = E.clone().sub(S).normalize(), d2 = T.clone().sub(E).normalize();
+  let n = d1.clone().cross(d2);
+  if (n.length() < 1e-3) n = d1.clone().cross(p.clone().negate());
+  n.normalize();
+  setWorldFrame(up, R.rest[L.up].wq, L.d1, L.n, d1, n);
+  setWorldFrame(lo, R.rest[L.lo].wq, L.d2, L.n, d2, n);
+  return { E, T, n, d2 };
+}
+// hand: fingers along `dir`, palm facing `palmN`
+function setHand(side, dir, palmN) {
+  const b = side === 'L' ? 'LeftHand' : 'RightHand', H = R.hand[side];
+  setWorldFrame(R[b], R.rest[b].wq, H.d, H.n, dir, palmN);
+  R.handState = R.handState || {}; R.handState[side] = { dir: dir.clone().normalize(), n: palmN.clone().normalize() };
+}
+function setFoot(name, dir, upv) { const L = R.limb[name]; setWorldFrame(R[name], R.rest[name].wq, L.d, L.u, dir, upv); }
+
+function resetPose() { for (const n in R.rest) { R[n].quaternion.copy(R.rest[n].q); R[n].position.copy(R.rest[n].p); } char.updateMatrixWorld(true); }
+// hips: world position + body orientation quaternion (applied on top of rest)
+function setHips(pos, bodyQ) {
+  const h = R.Hips; h.parent.updateMatrixWorld(true);
+  h.position.copy(h.parent.worldToLocal(pos.clone()));
+  const pq = h.parent.getWorldQuaternion(new THREE.Quaternion());
+  h.quaternion.copy(pq.invert().multiply(bodyQ.clone().multiply(R.rest.Hips.wq)));
+  h.updateMatrixWorld(true);
+}
+function rotLocal(name, x, y = 0, z = 0) {          // extra local rotation (radians) on top of current
+  R[name].quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z, 'XYZ')));
+  R[name].updateMatrixWorld(true);
+}
+const wpos = (n) => R[n].getWorldPosition(V());
+
+// ---------------- muscles (painted from bind pose, tinted in the shader) ----------------
+const MUSCLE = { level: 0 };
+let muscleAttr;
+const smooth = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+function band(x, a, b, f = 0.02) { return smooth(a - f, a + f, x) * (1 - smooth(b - f, b + f, x)); }
+function segT(p, a, b) { const ab = b.clone().sub(a); return { t: p.clone().sub(a).dot(ab) / ab.lengthSq(), r: p.clone().sub(a).sub(ab.multiplyScalar(p.clone().sub(a).dot(ab) / ab.lengthSq())).length() }; }
+let BIND = null;
+function setupMuscles() {
+  const g = skinned.geometry, pos = g.attributes.position, nor = g.attributes.normal, n = pos.count;
+  skinned.updateMatrixWorld(true);
+  const nm = new THREE.Matrix3().getNormalMatrix(skinned.matrixWorld);
+  BIND = { p: new Float32Array(n * 3), n: new Float32Array(n * 3) };
+  // true rest-pose positions: run each vertex through the skin (bind matrix + bones), then to world.
+  // Normals: skin a point nudged along the normal and take the difference.
+  skinned.skeleton.update();
+  const p = V(), q = V(), raw = V(), nn = V();
+  for (let i = 0; i < n; i++) {
+    raw.fromBufferAttribute(pos, i); nn.fromBufferAttribute(nor, i);
+    p.copy(raw); skinned.applyBoneTransform(i, p); p.applyMatrix4(skinned.matrixWorld);
+    q.copy(raw).add(nn.multiplyScalar(0.5)); skinned.applyBoneTransform(i, q); q.applyMatrix4(skinned.matrixWorld);
+    q.sub(p).normalize();
+    BIND.p.set([p.x, p.y, p.z], i * 3); BIND.n.set([q.x, q.y, q.z], i * 3);
+  }
+  muscleAttr = new THREE.BufferAttribute(new Float32Array(n), 1); g.setAttribute('muscle', muscleAttr);
+  const mat = skinned.material;
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uMus = { value: 0 }; MUSCLE.u = sh.uniforms.uMus;
+    sh.vertexShader = 'attribute float muscle;\nvarying float vMus;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvMus = muscle;');
+    sh.fragmentShader = 'uniform float uMus;\nvarying float vMus;\n' + sh.fragmentShader
+      .replace('#include <map_fragment>', '#include <map_fragment>\nfloat mk = vMus * (0.55 + 0.45 * uMus);\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.16, 0.08), clamp(mk, 0.0, 1.0) * 0.55);')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(1.0, 0.18, 0.07) * vMus * (0.03 + 0.2 * uMus);');
+  };
+  mat.needsUpdate = true;
+}
+function paintMuscles(primary, secondary) {
+  const rp = (k) => R.rest[k].wp, n = muscleAttr.count, P = V(), N = V();
+  const arr = muscleAttr.array;
+  for (let i = 0; i < n; i++) {
+    P.set(BIND.p[i * 3], BIND.p[i * 3 + 1], BIND.p[i * 3 + 2]); N.set(BIND.n[i * 3], BIND.n[i * 3 + 1], BIND.n[i * 3 + 2]);
+    const s = P.x >= 0 ? 'Left' : 'Right', ax = Math.abs(P.x), y = P.y;
+    const arm = segT(P, rp(s + 'Arm'), rp(s + 'ForeArm')), fore = segT(P, rp(s + 'ForeArm'), rp(s + 'Hand'));
+    const thigh = segT(P, rp(s + 'UpLeg'), rp(s + 'Leg')), shin = segT(P, rp(s + 'Leg'), rp(s + 'Foot'));
+    const onArm = arm.r < 0.075, onFore = fore.r < 0.06, onThigh = thigh.r < 0.11, onShin = shin.r < 0.085;
+    const torso = ax < 0.2 && y > 0.95 && y < 1.48 && !onArm;
+    const v = {
+      chest: torso ? band(y, 1.22, 1.39) * smooth(0.25, 0.55, N.z) * (1 - smooth(0.15, 0.19, ax)) * smooth(0.012, 0.03, ax) : 0,
+      abs: torso ? band(y, 0.98, 1.21) * smooth(0.35, 0.65, N.z) * (1 - smooth(0.085, 0.11, ax)) : 0,
+      lats: torso ? band(y, 1.1, 1.34) * smooth(0.25, 0.6, Math.abs(N.x) - N.z * 0.6) * smooth(0.06, 0.12, ax) : 0,
+      traps: torso ? band(y, 1.34, 1.49) * smooth(0.1, 0.5, -N.z) * (1 - smooth(0.13, 0.17, ax)) : 0,
+      lowerback: torso ? band(y, 0.97, 1.16) * smooth(0.35, 0.7, -N.z) * (1 - smooth(0.08, 0.11, ax)) : 0,
+      delts: (1 - smooth(0.06, 0.1, P.distanceTo(rp(s + 'Arm').clone().add(V(0, 0.015, 0))))) * smooth(-0.2, 0.2, N.y + Math.abs(N.x) * 0.5),
+      biceps: onArm ? band(arm.t, 0.28, 0.88, 0.06) * smooth(0.1, 0.45, N.z) : 0,
+      triceps: onArm ? band(arm.t, 0.22, 0.86, 0.06) * smooth(0.1, 0.45, -N.z) : 0,
+      forearms: onFore ? band(fore.t, 0.05, 0.6, 0.06) * smooth(-0.1, 0.3, N.z) : 0,
+      glutes: ax < 0.2 && band(y, 0.8, 1.0) * smooth(0.25, 0.6, -N.z) || 0,
+      quads: onThigh ? band(thigh.t, 0.12, 0.88, 0.06) * smooth(0.0, 0.4, N.z) : 0,
+      hamstrings: onThigh ? band(thigh.t, 0.25, 0.9, 0.06) * smooth(0.1, 0.45, -N.z) : 0,
+      calves: onShin ? band(shin.t, 0.06, 0.55, 0.06) * smooth(0.0, 0.4, -N.z) : 0,
+    };
+    let m = 0;
+    for (const k of primary) m = Math.max(m, v[k] || 0);
+    for (const k of secondary) m = Math.max(m, (v[k] || 0) * 0.45);
+    arr[i] = m;
+  }
+  muscleAttr.needsUpdate = true;
+}
+
+// ---------------- motion helpers ----------------
+const mj = (t) => t * t * t * (10 - 15 * t + 6 * t * t);            // minimum-jerk easing
+const lerp = (a, b, t) => a + (b - a) * t;
+const vlerp = (a, b, t) => a.clone().lerp(b, t);
+// rep timeline: segments of [duration, from, to, easing]; returns position 0..1 (0 = start pose, 1 = end pose)
+function timeline(segs) {
+  const total = segs.reduce((s, x) => s + x[0], 0);
+  return { total, at(t) { t = ((t % total) + total) % total; for (const [d, a, b, e] of segs) { if (t <= d) return lerp(a, b, (e || mj)(t / d)); t -= d; } return segs[segs.length - 1][2]; } };
+}
+// critically-damped follow for secondary motion (weights swaying a little behind the hands)
+function spring(k = 90, c = 2 * Math.sqrt(90), maxLag = 0.008) {
+  let x = null, v = V();
+  return { reset() { x = null; v = V(); }, step(target, dt) {
+    if (!x) { x = target.clone(); return x.clone(); }
+    const a = target.clone().sub(x).multiplyScalar(k).sub(v.clone().multiplyScalar(c)); v.add(a.multiplyScalar(dt)); x.add(v.clone().multiplyScalar(dt));
+    const lag = x.clone().sub(target); if (lag.length() > maxLag) { lag.setLength(maxLag); x = target.clone().add(lag); }
+    return x.clone(); } };
+}
+// grip point: middle of the palm, just off its surface (the hands have no finger bones, so objects
+// rest against the palm)
+function palm(side) {
+  const h = wpos(side === 'L' ? 'LeftHand' : 'RightHand'), st = R.handState && R.handState[side];
+  if (!st) return h;
+  return h.clone().add(st.dir.clone().multiplyScalar(GRIP.du)).add(st.n.clone().multiplyScalar(GRIP.dv));
+}
+// wrist target that puts the grip centre on `grip` given finger dir + palm normal
+function wristFor(grip, dir, n) { return grip.clone().sub(dir.clone().normalize().multiplyScalar(GRIP.du)).sub(n.clone().normalize().multiplyScalar(GRIP.dv)); }
+
+// ---------------- exercises ----------------
+const EX = {};
+EX.bench = {
+  muscles: [['chest'], ['triceps', 'delts']],
+  cam: { dir: V(0.78, 0.42, 1), fov: 28 },
+  // top hold → slow lowering → touch → drive up
+  tl: timeline([[0.45, 0, 0], [1.45, 0, 1, mj], [0.18, 1, 1], [1.0, 1, 0, (t) => mj(Math.pow(t, 0.85))]]),
+  setup() {
+    this.bench = flatBench(-0.62, 0.62); scene.add(this.bench);
+    this.bar = barbell(); scene.add(this.bar);
+    this.sway = spring(140);
+  },
+  fit() { return [this.bar, this.bench]; },
+  pose(p, t, dt) {
+    const bodyQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+    const breathe = Math.sin(t * 2 * Math.PI / 3.2) * 0.004;
+    setHips(V(0, 0.555 + breathe, 0.36), bodyQ);
+    rotLocal('Spine02', -0.07); rotLocal('Spine01', -0.06 - breathe * 4); rotLocal('Spine', -0.03);   // slight arch
+    rotLocal('neck', 0.18); rotLocal('Head', 0.12);
+    // bar path: over the shoulders at lockout, lower chest at the bottom (a gentle J curve)
+    const top = V(0, 1.12, -0.04), bot = V(0, 0.735, 0.085);
+    const c = vlerp(top, bot, p); c.z = lerp(top.z, bot.z, Math.pow(p, 1.6));
+    const fd = V(0, 1, -0.12).normalize(), pn = V(0, 0.12, 1).normalize();
+    for (const [s, sx] of [['L', 1], ['R', -1]]) {
+      solveLimb(s, wristFor(V(sx * 0.4, c.y, c.z), fd, pn), V(sx * 0.75, -0.55, 0.35));
+      setHand(s, fd, pn);
+    }
+    for (const [s, sx, f] of [['LL', 1, 'LeftFoot'], ['RL', -1, 'RightFoot']]) {
+      solveLimb(s, V(sx * 0.27, 0.095, 0.86), V(sx * 0.35, 1, 0.2));
+      setFoot(f, V(sx * 0.15, -0.05, 1).normalize(), V(0, 1, 0));
+    }
+    const mid = palm('L').add(palm('R')).multiplyScalar(0.5);
+    this.bar.position.copy(this.sway.step(mid, dt));
+    MUSCLE.level = 0.25 + 0.75 * (1 - p) * (p < 0.98 ? 1 : 1);
+  },
+};
+EX.curl = {
+  muscles: [['biceps'], ['forearms']],
+  cam: { dir: V(1, 0.16, 0.62), fov: 28 },
+  tl: timeline([[0.35, 0, 0], [0.95, 0, 1, mj], [0.35, 1, 1], [1.45, 1, 0, mj]]),
+  setup() {
+    this.db = [dumbbell(), dumbbell()]; this.db.forEach((d) => scene.add(d));
+    this.sw = [spring(110), spring(110)];
+  },
+  fit() { return this.db; },
+  pose(p, t, dt) {
+    const lean = -0.035 * p;
+    setHips(V(0, 0.975, -0.035), new THREE.Quaternion());
+    rotLocal('Spine02', lean); rotLocal('Spine01', lean * 0.6);
+    rotLocal('Head', 0.05);
+    for (const [s, sx, i] of [['L', 1, 0], ['R', -1, 1]]) {
+      const sho = wpos(sx > 0 ? 'LeftArm' : 'RightArm');
+      const elbow = sho.clone().add(V(sx * 0.035, -0.245, -0.02 - 0.02 * p));
+      const ang = lerp(-0.12, 2.25, p);                                  // forearm angle from straight down
+      const hand = elbow.clone().add(V(0, -Math.cos(ang), Math.sin(ang)).multiplyScalar(R.limb[s].b));
+      const fd = V(0, -Math.cos(ang), Math.sin(ang)), pn = V(sx * -0.12, Math.sin(ang), Math.cos(ang)).normalize();
+      solveLimb(s, wristFor(hand.clone().add(fd.clone().multiplyScalar(0.1)), fd, pn), V(sx * 0.15, -0.25, -1));
+      setHand(s, fd, pn);
+      const pm = palm(s), d = this.sw[i].step(pm, dt);
+      this.db[i].position.copy(d);
+      this.db[i].rotation.set(0, 0, 0);
+      this.db[i].rotation.y = sx * 0.12;
+    }
+    for (const [s, sx, f] of [['LL', 1, 'LeftFoot'], ['RL', -1, 'RightFoot']]) {
+      solveLimb(s, V(sx * 0.13, 0.095, -0.03), V(sx * 0.05, 0, 1));
+      setFoot(f, V(sx * 0.12, -0.38, 1).normalize(), V(0, 1, 0));
+    }
+    MUSCLE.level = p;
+  },
+};
+
+// ex-more
+// ---------------- building blocks ----------------
+const SIDES = [['L', 1], ['R', -1]];
+const ARM = { L: 'LeftArm', R: 'RightArm' }, LEG = { L: 'LL', R: 'RL' }, FOOT = { L: 'LeftFoot', R: 'RightFoot' };
+const qE = (x, y = 0, z = 0) => new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z, 'YXZ'));
+const sho = (s) => wpos(ARM[s]);
+const anterior = (fd) => V(0, fd.z, -fd.y).normalize();       // palm toward the front of the forearm (supinated)
+
+// reach a grip point; palm faces `pn` (or pnFn(fingerDir)); wrist follows the forearm
+function grip(side, P, pn, pole, pnFn) {
+  let fd = P.clone().sub(sho(side)).normalize(), n, r;
+  const nOf = (f) => { const x = (pnFn ? pnFn(f) : pn).clone(); return x.sub(f.clone().multiplyScalar(x.dot(f))).normalize(); };
+  for (let it = 0; it < 3; it++) { n = nOf(fd); r = solveLimb(side, wristFor(P, fd, n), pole); fd = r.T.clone().sub(r.E).normalize(); }
+  n = nOf(fd); setHand(side, fd, n);
+  return { fd, n, axis: fd.clone().cross(n).normalize() };
+}
+// arm hanging/relaxed: hand at P, fingers continuing the forearm, palm toward `pn`
+function relax(side, P, pn, pole) { return grip(side, P.clone(), pn, pole); }
+function leg(side, ankle, pole, toeDir, up = V(0, 1, 0)) {
+  solveLimb(LEG[side], ankle, pole); setFoot(FOOT[side], toeDir.clone().normalize(), up);
+}
+const flatToe = (sx, out = 0.12) => V(sx * out, -1, 1).normalize();
+function stand(w = 0.13, z = -0.03, out = 0.12) { for (const [s, sx] of SIDES) leg(s, V(sx * w, 0.095, z), V(sx * 0.05, 0, 1), flatToe(sx, out)); }
+function sitLegs(kneeZ = 0.42, w = 0.17) { for (const [s, sx] of SIDES) leg(s, V(sx * w, 0.095, kneeZ), V(sx * 0.1, 0.4, 1), flatToe(sx, 0.1)); }
+
+function place(obj, pos, axis) { obj.position.copy(pos); if (axis) obj.quaternion.setFromUnitVectors(V(1, 0, 0), axis.clone().normalize()); }
+function box(w, h, d, mat, pos) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); if (pos) m.position.copy(pos); return shadowed(m); }
+// rounded pad from a to b, `width` wide, `thick` thick, top facing roughly `up`
+function padBetween(a, b, width, thick, up = V(0, 1, 0)) {
+  const len = a.distanceTo(b), m = roundedBox(width, thick, len, Math.min(0.035, width / 4), M.leather);
+  const z = b.clone().sub(a).normalize(), x = up.clone().cross(z).normalize(), y = z.clone().cross(x);
+  m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
+  m.position.copy(a.clone().add(b).multiplyScalar(0.5)).sub(y.clone().multiplyScalar(thick / 2));
+  return shadowed(m);
+}
+function postCyl(a, b, r = 0.025, mat = M.frame) { const m = cylBetween(a, b, r, mat); return m; }
+function cylBetween(a, b, r, mat) {
+  const d = b.clone().sub(a), m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 1, 16), mat);
+  m.scale.set(1, d.length(), 1); m.position.copy(a.clone().add(b).multiplyScalar(0.5)); m.quaternion.setFromUnitVectors(V(0, 1, 0), d.normalize());
+  return shadowed(m);
+}
+function cableLine() {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 1, 6), M.steel); m.castShadow = true; scene.add(m);
+  return (a, b) => { const d = b.clone().sub(a); m.scale.set(1, Math.max(0.001, d.length()), 1); m.position.copy(a.clone().add(b).multiplyScalar(0.5)); m.quaternion.setFromUnitVectors(V(0, 1, 0), d.normalize()); };
+}
+function pulley(p) { const g = new THREE.Group(); const w = cyl(0.045, 0.03, M.dark, 24); w.rotation.z = Math.PI / 2; g.add(w); g.position.copy(p); return shadowed(g); }
+// cable station: upright with a weight stack, pulley at height h
+function cableColumn(x, z, h, pulleyAt) {
+  const g = new THREE.Group();
+  g.add(box(0.09, 2.3, 0.09, M.frame, V(x, 1.15, z)));
+  g.add(box(0.2, 0.62, 0.12, M.rubber, V(x, 0.36, z + Math.sign(-z || 1) * 0.0)));
+  if (pulleyAt) g.add(pulley(pulleyAt));
+  return shadowed(g);
+}
+function handleBar(len = 0.3) { const m = cyl(0.014, len, M.steel); const g = new THREE.Group(); m.rotation.z = Math.PI / 2; g.add(m); return shadowed(g); }
+function mat_() { const m = roundedBox(0.62, 0.012, 1.85, 0.05, new THREE.MeshStandardMaterial({ color: 0x1d1d20, roughness: 0.9 })); m.position.y = 0.006; return shadowed(m); }
+function seatWithBack(seatY = 0.45, z0 = -0.2, z1 = 0.28, backTop = 1.35, recline = 0.05) {
+  const g = new THREE.Group();
+  g.add(padBetween(V(0, seatY, z0), V(0, seatY, z1), 0.36, 0.09));
+  const bz = z0 - 0.03, b0 = V(0, seatY + 0.05, bz), b1 = V(0, backTop, bz - Math.tan(recline) * (backTop - seatY));
+  g.add(padBetween(b0, b1, 0.32, 0.09, V(0, 0, 1)));
+  g.add(box(0.06, seatY - 0.05, 0.06, M.frame, V(0, (seatY - 0.05) / 2, (z0 + z1) / 2)));
+  g.add(box(0.5, 0.04, 0.07, M.frame, V(0, 0.02, (z0 + z1) / 2)));
+  g.add(postCyl(V(0, seatY - 0.05, bz - 0.05), b1.clone().add(V(0, -0.05, -0.06)), 0.022));
+  return shadowed(g);
+}
+function setMuscle(p) { MUSCLE.level = Math.max(0, Math.min(1, p)); }
+
+// ---------------- the rest of the plan ----------------
+EX['bench-incline'] = {
+  muscles: [['chest'], ['delts', 'triceps']], cam: { dir: V(0.9, 0.38, 0.85), fov: 28 },
+  tl: timeline([[0.4, 0, 0], [1.4, 0, 1], [0.15, 1, 1], [1.0, 1, 0]]),
+  setup() {
+    const ang = 0.6, spine = V(0, Math.cos(-Math.PI / 2 + ang), Math.sin(-Math.PI / 2 + ang)), back = V(0, Math.sin(-Math.PI / 2 + ang), -Math.cos(-Math.PI / 2 + ang));
+    this.q = qE(-Math.PI / 2 + ang); this.hip = V(0, 0.6, 0.27);
+    const h = this.hip.clone().add(back.clone().multiplyScalar(0.12));
+    const g = new THREE.Group();
+    g.add(padBetween(h.clone().add(spine.clone().multiplyScalar(-0.05)), h.clone().add(spine.clone().multiplyScalar(0.78)), 0.3, 0.09, back.clone().negate()));
+    g.add(padBetween(V(0, 0.44, 0.12), V(0, 0.44, 0.52), 0.32, 0.09));
+    g.add(box(0.07, 0.4, 0.07, M.frame, V(0, 0.2, 0.3))); g.add(box(0.5, 0.04, 0.07, M.frame, V(0, 0.02, 0.3)));
+    g.add(postCyl(V(0, 0.38, 0.05), h.clone().add(spine.clone().multiplyScalar(0.55)).add(back.clone().multiplyScalar(0.08)), 0.022));
+    g.add(box(0.5, 0.04, 0.07, M.frame, V(0, 0.02, -0.35))); g.add(postCyl(V(0, 0.02, -0.35), h.clone().add(spine.clone().multiplyScalar(0.55)).add(back.clone().multiplyScalar(0.08)), 0.022));
+    scene.add(this.bench = shadowed(g));
+    this.db = [dumbbell(), dumbbell()]; this.db.forEach((d) => scene.add(d));
+  },
+  fit() { return [this.bench, ...this.db]; },
+  pose(p) {
+    setHips(this.hip, this.q); rotLocal('neck', 0.15);
+    const feet = V(0, -0.57, 0.82).normalize();
+    for (const [s, sx] of SIDES) {
+      const S = sho(s), top = S.clone().add(V(-sx * 0.04, 0.5, 0.1)), bot = S.clone().add(V(sx * 0.13, 0.07, 0.12));
+      const g = grip(s, vlerp(top, bot, p), feet, V(sx * 0.8, -0.6, 0.15));
+      place(this.db[s === 'L' ? 0 : 1], palm(s), g.axis);
+      leg(s, V(sx * 0.27, 0.095, 0.78), V(sx * 0.3, 1, 0.2), flatToe(sx, 0.15));
+    }
+    setMuscle(1 - p);
+  },
+};
+EX.ohp = {
+  muscles: [['delts'], ['triceps', 'traps']], cam: { dir: V(0.75, 0.2, 1), fov: 28 },
+  tl: timeline([[0.4, 0, 0], [1.4, 0, 1], [0.15, 1, 1], [1.0, 1, 0]]),
+  setup() { scene.add(this.seat = seatWithBack(0.45, -0.18, 0.28, 1.38, 0.08)); this.db = [dumbbell(), dumbbell()]; this.db.forEach((d) => scene.add(d)); },
+  fit() { return [this.seat, ...this.db]; },
+  pose(p) {
+    setHips(V(0, 0.6, -0.08), qE(-0.06));
+    sitLegs(0.42);
+    for (const [s, sx] of SIDES) {
+      const S = sho(s), top = S.clone().add(V(-sx * 0.04, 0.55, 0.03)), bot = S.clone().add(V(sx * 0.17, 0.09, 0.05));
+      const g = grip(s, vlerp(top, bot, p), V(0, 0, 1), V(sx, -0.35, -0.1));
+      place(this.db[s === 'L' ? 0 : 1], palm(s), g.axis);
+    }
+    setMuscle(1 - p);
+  },
+};
+EX.arnold = {
+  muscles: [['delts'], ['triceps']], cam: { dir: V(0.75, 0.2, 1), fov: 28 },
+  tl: timeline([[0.35, 0, 0], [1.5, 0, 1], [0.2, 1, 1], [1.4, 1, 0]]),
+  setup() { EX.ohp.setup.call(this); }, fit() { return [this.seat, ...this.db]; },
+  pose(p) {
+    setHips(V(0, 0.6, -0.08), qE(-0.06)); sitLegs(0.42);
+    for (const [s, sx] of SIDES) {
+      const S = sho(s), bot = S.clone().add(V(-sx * 0.08, 0.06, 0.24)), top = S.clone().add(V(-sx * 0.04, 0.55, 0.03));
+      const mid = S.clone().add(V(sx * 0.15, 0.2, 0.08));
+      const P = p < 0.45 ? vlerp(bot, mid, p / 0.45) : vlerp(mid, top, (p - 0.45) / 0.55);
+      const a = Math.min(1, p / 0.6) * Math.PI;                         // palms rotate from facing you to facing forward
+      const pn = V(0, 0, -1).applyAxisAngle(V(0, 1, 0), -sx * a);
+      const pole = vlerp(V(0, -1, 1), V(sx, -0.35, -0.1), Math.min(1, p * 1.5)).normalize();
+      const g = grip(s, P, pn, pole);
+      place(this.db[s === 'L' ? 0 : 1], palm(s), g.axis);
+    }
+    setMuscle(p);
+  },
+};
+EX.lateral = {
+  muscles: [['delts'], ['traps']], cam: { dir: V(0.35, 0.15, 1), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [1.0, 0, 1], [0.3, 1, 1], [1.4, 1, 0]]),
+  setup() { this.db = [dumbbell(), dumbbell()]; this.db.forEach((d) => scene.add(d)); }, fit() { return this.db; },
+  pose(p) {
+    setHips(V(0, 0.975, -0.035), qE(0.06)); stand();
+    for (const [s, sx] of SIDES) {
+      const S = sho(s), a = lerp(0.12, 1.5, p), r = 0.56;
+      const P = S.clone().add(V(sx * Math.sin(a) * r, -Math.cos(a) * r, 0.07));
+      const pn = vlerp(V(-sx, 0, 0.1), V(0, -1, 0.15), p).normalize();
+      const g = grip(s, P, pn, V(0, 0.3, -1));
+      place(this.db[s === 'L' ? 0 : 1], palm(s), g.axis);
+    }
+    setMuscle(p);
+  },
+};
+EX.frontraise = {
+  muscles: [['delts'], []], cam: { dir: V(1, 0.15, 0.6), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [1.0, 0, 1], [0.3, 1, 1], [1.4, 1, 0]]),
+  setup() { EX.lateral.setup.call(this); }, fit() { return this.db; },
+  pose(p) {
+    setHips(V(0, 0.975, -0.035), qE(0)); stand();
+    for (const [s, sx] of SIDES) {
+      const S = sho(s), a = lerp(0.1, 1.55, p), r = 0.57;
+      const g = grip(s, S.clone().add(V(-sx * 0.05, -Math.cos(a) * r, Math.sin(a) * r)), V(0, -1, -0.2), V(sx, 0.2, -0.3));
+      place(this.db[s === 'L' ? 0 : 1], palm(s), g.axis);
+    }
+    setMuscle(p);
+  },
+};
+function cableStandSetup(self, pulleyP, colZ) {
+  scene.add(self.col = cableColumn(0, colZ, 2.3, pulleyP)); self.pulleyP = pulleyP; self.cable = cableLine();
+}
+EX.pushdown = {
+  muscles: [['triceps'], ['forearms']], cam: { dir: V(1, 0.22, 0.45), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [0.9, 0, 1], [0.3, 1, 1], [1.3, 1, 0]]),
+  setup() { cableStandSetup(this, V(0, 2.05, 0.4), 0.48); this.bar = handleBar(0.22); scene.add(this.bar); },
+  fit() { return [this.col]; },
+  pose(p) {
+    setHips(V(0, 0.965, -0.06), qE(0.16)); rotLocal('neck', -0.1); stand(0.14, -0.02);
+    const pts = [];
+    for (const [s, sx] of SIDES) {
+      const S = sho(s), top = S.clone().add(V(-sx * 0.12, -0.2, 0.25)), bot = S.clone().add(V(-sx * 0.1, -0.56, 0.13));
+      grip(s, vlerp(top, bot, p), V(-sx * 0.3, -1, 0.1), V(sx * 0.1, -0.2, -1)); pts.push(palm(s));
+    }
+    const c = pts[0].clone().add(pts[1]).multiplyScalar(0.5); place(this.bar, c, pts[0].clone().sub(pts[1]));
+    this.cable(this.pulleyP, c); setMuscle(p);
+  },
+};
+EX.ohext = {
+  muscles: [['triceps'], ['delts']], cam: { dir: V(1, 0.2, 0.35), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [0.9, 0, 1], [0.3, 1, 1], [1.3, 1, 0]]),
+  setup() { cableStandSetup(this, V(0, 1.95, -0.78), -0.86); this.bar = handleBar(0.12); scene.add(this.bar); },
+  fit() { return [this.col]; },
+  pose(p) {
+    setHips(V(0, 0.95, 0.02), qE(0.42)); rotLocal('neck', -0.3);
+    leg('L', V(0.13, 0.095, 0.32), V(0.05, 0, 1), flatToe(1)); leg('R', V(-0.13, 0.13, -0.42), V(-0.05, -0.3, 1), V(-0.1, -1, 0.5).normalize());
+    const pts = [];
+    for (const [s, sx] of SIDES) {
+      const S = sho(s), bent = S.clone().add(V(-sx * 0.16, 0.13, -0.12)), ext = S.clone().add(V(-sx * 0.1, 0.38, 0.42));
+      grip(s, vlerp(bent, ext, p), V(-sx, 0, 0), V(sx * 0.2, 1, 0.5)); pts.push(palm(s));
+    }
+    const c = pts[0].clone().add(pts[1]).multiplyScalar(0.5); place(this.bar, c, pts[0].clone().sub(pts[1]));
+    this.cable(this.pulleyP, c); setMuscle(p);
+  },
+};
+EX.skull = {
+  muscles: [['triceps'], []], cam: { dir: V(0.78, 0.42, 1), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [1.3, 0, 1], [0.15, 1, 1], [0.9, 1, 0]]),
+  setup() { scene.add(this.bench = flatBench(-0.62, 0.62)); this.bar = barbell(0.15); this.bar.scale.set(0.62, 1, 1); scene.add(this.bar); },
+  fit() { return [this.bench, this.bar]; },
+  pose(p) {
+    setHips(V(0, 0.555, 0.36), qE(-Math.PI / 2)); rotLocal('neck', 0.18); rotLocal('Head', 0.12);
+    const pts = [];
+    for (const [s, sx] of SIDES) {
+      const S = sho(s), ext = S.clone().add(V(-sx * 0.06, 0.56, 0.05)), low = S.clone().add(V(-sx * 0.06, 0.32, -0.2));
+      grip(s, vlerp(ext, low, p), V(0, 0.3, 1), V(sx * 0.15, 0.4, 1)); pts.push(palm(s));
+      leg(s, V(sx * 0.27, 0.095, 0.86), V(sx * 0.35, 1, 0.2), flatToe(sx, 0.15));
+    }
+    place(this.bar, pts[0].clone().add(pts[1]).multiplyScalar(0.5), pts[0].clone().sub(pts[1])); setMuscle(1 - p);
+  },
+};
+EX['curl-hammer'] = {
+  muscles: [['biceps'], ['forearms']], cam: EX.curl.cam, tl: EX.curl.tl,
+  setup() { this.db = [dumbbell(), dumbbell()]; this.db.forEach((d) => scene.add(d)); }, fit() { return this.db; },
+  pose(p) {
+    setHips(V(0, 0.975, -0.035), new THREE.Quaternion()); rotLocal('Spine02', -0.035 * p); stand();
+    for (const [s, sx] of SIDES) {
+      const elbow = sho(s).add(V(sx * 0.035, -0.245, -0.02 - 0.02 * p)), ang = lerp(-0.12, 2.2, p);
+      const P = elbow.clone().add(V(0, -Math.cos(ang), Math.sin(ang)).multiplyScalar(R.limb[s].b + 0.11));
+      const g = grip(s, P, V(-sx, 0, 0), V(sx * 0.15, -0.25, -1));
+      place(this.db[s === 'L' ? 0 : 1], palm(s), g.axis);
+    }
+    setMuscle(p);
+  },
+};
+EX.preacher = {
+  muscles: [['biceps'], ['forearms']], cam: { dir: V(0.85, 0.3, 1), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [1.0, 0, 1], [0.3, 1, 1], [1.5, 1, 0]]),
+  setup() {
+    const g = new THREE.Group();
+    g.add(padBetween(V(0, 0.47, -0.32), V(0, 0.47, 0.02), 0.34, 0.09));
+    g.add(padBetween(V(0, 1.18, 0.12), V(0, 0.86, 0.43), 0.44, 0.08, V(0, 0.7, -0.7)));
+    g.add(box(0.07, 0.86, 0.07, M.frame, V(0, 0.43, 0.32))); g.add(box(0.5, 0.04, 0.07, M.frame, V(0, 0.02, 0.32)));
+    g.add(box(0.06, 0.42, 0.06, M.frame, V(0, 0.21, -0.15))); g.add(box(0.5, 0.04, 0.07, M.frame, V(0, 0.02, -0.15)));
+    scene.add(this.bench = shadowed(g));
+    this.bar = barbell(0.15); this.bar.scale.set(0.62, 1, 1); scene.add(this.bar);
+  },
+  fit() { return [this.bench, this.bar]; },
+  pose(p) {
+    setHips(V(0, 0.62, -0.17), qE(0.32)); rotLocal('neck', -0.2); sitLegs(0.3, 0.2);
+    const pts = [];
+    for (const [s, sx] of SIDES) {
+      const S = sho(s), elbow = V(sx * 0.16, 0.98, 0.33);
+      const ang = lerp(0.55, 2.65, p);                                   // forearm angle from straight down-forward
+      const P = elbow.clone().add(V(0, -Math.cos(ang), Math.sin(ang)).multiplyScalar(R.limb[s].b + 0.11));
+      grip(s, P, null, V(0, -1, 0.7), anterior); pts.push(palm(s));
+    }
+    place(this.bar, pts[0].clone().add(pts[1]).multiplyScalar(0.5), pts[0].clone().sub(pts[1])); setMuscle(p);
+  },
+};
+EX.chestpress = {
+  muscles: [['chest'], ['triceps', 'delts']], cam: { dir: V(1, 0.3, 0.45), fov: 28 },
+  tl: timeline([[0.35, 0, 0], [1.0, 0, 1], [0.2, 1, 1], [1.4, 1, 0]]),
+  setup() {
+    scene.add(this.seat = seatWithBack(0.45, -0.2, 0.22, 1.45, 0.12));
+    this.h = [handleBar(0.14), handleBar(0.14)]; this.h.forEach((h) => scene.add(h));
+    const fr = new THREE.Group(); for (const x of [-0.5, 0.5]) fr.add(box(0.08, 1.3, 0.08, M.frame, V(x, 0.65, -0.32))); scene.add(this.frame = shadowed(fr));
+  },
+  fit() { return [this.seat, this.frame]; },
+  pose(p) {
+    setHips(V(0, 0.6, -0.1), qE(-0.1)); sitLegs(0.4);
+    for (const [s, sx] of SIDES) {
+      const S = sho(s), back = S.clone().add(V(sx * 0.05, -0.12, 0.2)), fwd = S.clone().add(V(-sx * 0.02, -0.1, 0.6));
+      const g = grip(s, vlerp(back, fwd, 1 - p), V(0, -0.1, 1), V(sx, -0.6, -0.5));
+      const i = s === 'L' ? 0 : 1, pm = palm(s);
+      place(this.h[i], pm, V(1, 0, 0));
+    }
+    setMuscle(1 - p);
+  },
+};
+EX.fly = {
+  muscles: [['chest'], ['delts']], cam: { dir: V(0.5, 0.7, 1), fov: 30 },
+  tl: timeline([[0.35, 0, 0], [1.5, 0, 1], [0.15, 1, 1], [1.2, 1, 0]]),
+  setup() { scene.add(this.bench = flatBench(-0.62, 0.62)); this.db = [dumbbell(), dumbbell()]; this.db.forEach((d) => scene.add(d)); },
+  fit() { return [this.bench, ...this.db]; },
+  pose(p) {
+    setHips(V(0, 0.555, 0.36), qE(-Math.PI / 2)); rotLocal('neck', 0.18);
+    for (const [s, sx] of SIDES) {
+      const S = sho(s), a = lerp(0.08, 1.32, p), r = 0.55;
+      const P = S.clone().add(V(sx * Math.sin(a) * r, Math.cos(a) * r, 0.04));
+      const pn = vlerp(V(-sx, 0, 0), V(-sx * 0.3, 1, 0), p).normalize();
+      const g = grip(s, P, pn, V(sx * 0.4, -0.9, 0.3));
+      place(this.db[s === 'L' ? 0 : 1], palm(s), g.axis);
+      leg(s, V(sx * 0.27, 0.095, 0.86), V(sx * 0.35, 1, 0.2), flatToe(sx, 0.15));
+    }
+    setMuscle(1 - p);
+  },
+};
+EX['crossover-up'] = {
+  muscles: [['chest'], ['delts']], cam: { dir: V(0.45, 0.2, 1), fov: 30 },
+  tl: timeline([[0.3, 0, 0], [1.0, 0, 1], [0.35, 1, 1], [1.3, 1, 0]]),
+  setup() {
+    this.cols = [cableColumn(0.95, -0.05, 2.3, V(0.9, 0.32, -0.05)), cableColumn(-0.95, -0.05, 2.3, V(-0.9, 0.32, -0.05))]; this.cols.forEach((c) => scene.add(c));
+    this.cab = [cableLine(), cableLine()]; this.h = [handleBar(0.12), handleBar(0.12)]; this.h.forEach((h) => scene.add(h));
+  },
+  fit() { return this.cols; },
+  pose(p) {
+    setHips(V(0, 0.95, 0), qE(0.14)); rotLocal('neck', -0.1);
+    leg('L', V(0.13, 0.095, 0.26), V(0.05, 0, 1), flatToe(1)); leg('R', V(-0.14, 0.12, -0.3), V(-0.05, -0.3, 1), V(-0.1, -1, 0.6).normalize());
+    for (const [s, sx] of SIDES) {
+      const S = sho(s), low = S.clone().add(V(sx * 0.33, -0.5, 0.12)), high = S.clone().add(V(-sx * 0.16, 0.02, 0.48));
+      const g = grip(s, vlerp(low, high, p), V(0, 0.75, 0.65), V(sx * 0.6, -1, -0.3));
+      const i = s === 'L' ? 0 : 1, pm = palm(s); place(this.h[i], pm, g.axis); this.cab[i](V(sx * 0.9, 0.32, -0.05), pm);
+    }
+    setMuscle(p);
+  },
+};
+EX.squat = {
+  muscles: [['quads', 'glutes'], ['hamstrings']], cam: { dir: V(1, 0.22, 0.6), fov: 28 },
+  tl: timeline([[0.35, 0, 0], [1.5, 0, 1], [0.15, 1, 1], [1.2, 1, 0]]),
+  setup() { this.bar = barbell(); scene.add(this.bar); }, fit() { return [this.bar]; },
+  pose(p) {
+    const lean = 0.62 * p;
+    setHips(V(0, lerp(0.975, 0.58, p), lerp(-0.035, -0.3, p)), qE(lean)); rotLocal('neck', -0.45 * p); rotLocal('Head', -0.1 * p);
+    for (const [s, sx] of SIDES) leg(s, V(sx * 0.19, 0.095, 0.0), V(sx * 0.3, 0, 1), flatToe(sx, 0.28));
+    const nk = wpos('neck'), back = V(0, -Math.sin(lean), -Math.cos(lean));
+    const bar = nk.clone().add(back.multiplyScalar(0.07)).add(V(0, -0.03, 0));
+    for (const [s, sx] of SIDES) grip(s, bar.clone().add(V(sx * 0.55, 0, 0)), V(0, 0.2, 1), V(sx * 0.35, -1, -0.7));
+    place(this.bar, bar, V(1, 0, 0)); setMuscle(p);
+  },
+};
+EX.legpress = {
+  muscles: [['glutes', 'quads'], ['hamstrings']], cam: { dir: V(1, 0.3, 0.25), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [1.4, 0, 1], [0.15, 1, 1], [1.0, 1, 0]]),
+  setup() {
+    this.q = qE(-0.82); this.hip = V(0, 0.52, -0.05);
+    const s = V(0, 0.62, 0.78).normalize(); this.s = s;
+    const spine = V(0, Math.cos(-0.82), Math.sin(-0.82)), back = V(0, Math.sin(-0.82), -Math.cos(-0.82));
+    const g = new THREE.Group();
+    const h = this.hip.clone().add(back.clone().multiplyScalar(0.12));
+    g.add(padBetween(h.clone().add(spine.clone().multiplyScalar(-0.02)), h.clone().add(spine.clone().multiplyScalar(0.72)), 0.4, 0.09, back.clone().negate()));
+    g.add(padBetween(V(0, 0.4, -0.15), V(0, 0.4, 0.15), 0.4, 0.09));
+    for (const x of [-0.32, 0.32]) g.add(postCyl(V(x, 0.2, -0.1), V(x, 0.2, 0).add(s.clone().multiplyScalar(1.4)), 0.03));
+    g.add(box(0.8, 0.05, 1.6, M.frame, V(0, 0.025, 0.4)));
+    scene.add(this.frame = shadowed(g));
+    this.plate = shadowed(roundedBox(0.62, 0.05, 0.5, 0.04, M.dark)); scene.add(this.plate);
+  },
+  fit() { return [this.frame]; },
+  pose(p) {
+    setHips(this.hip, this.q); rotLocal('neck', 0.25);
+    const s = this.s, toe = V(0, 0.78, -0.62).normalize(), up = s.clone().negate();
+    for (const [sd, sx] of SIDES) {
+      leg(sd, this.hip.clone().add(s.clone().multiplyScalar(lerp(0.74, 0.42, p))).add(V(sx * 0.16, 0.0, 0)), V(sx * 0.25, 1, -0.2), toe, up);
+      grip(sd, this.hip.clone().add(V(sx * 0.3, 0.02, 0.06)), V(-sx, 0, 0), V(sx, 0, -1));
+    }
+    const ank = wpos('LeftFoot').add(wpos('RightFoot')).multiplyScalar(0.5);
+    this.plate.position.copy(ank.clone().add(s.clone().multiplyScalar(0.09)));
+    this.plate.quaternion.setFromUnitVectors(V(0, 1, 0), s.clone().negate());
+    setMuscle(1 - p);
+  },
+};
+EX.legext = {
+  muscles: [['quads'], []], cam: { dir: V(1, 0.22, 0.4), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [0.9, 0, 1], [0.35, 1, 1], [1.3, 1, 0]]),
+  setup() {
+    scene.add(this.seat = seatWithBack(0.47, -0.2, 0.3, 1.32, 0.15));
+    this.roll = cyl(0.045, 0.34, M.leather, 24); this.roll.rotation.z = Math.PI / 2; scene.add(shadowed(this.roll));
+    this.lever = cylBetween(V(), V(0, 1, 0), 0.02, M.frame); scene.add(this.lever);
+  },
+  fit() { return [this.seat]; },
+  pose(p) {
+    setHips(V(0, 0.62, -0.1), qE(-0.12)); rotLocal('neck', 0.05);
+    for (const [s, sx] of SIDES) {
+      const knee = V(sx * 0.13, 0.53, 0.35), ang = lerp(0.12, 1.45, p);
+      const ank = knee.clone().add(V(0, -Math.cos(ang), Math.sin(ang)).multiplyScalar(0.39));
+      const sd = ank.clone().sub(knee).normalize();
+      leg(s, ank, V(0, 1, 0.3), V(0, sd.z, -sd.y).add(V(0, 0.2, 0)).normalize(), sd.clone().negate());
+      grip(s, V(sx * 0.27, 0.52, -0.05), V(-sx, 0, 0), V(sx, 0, -1));
+    }
+    const k = V(0, 0.53, 0.35), ang = lerp(0.12, 1.45, p), sd = V(0, -Math.cos(ang), Math.sin(ang));
+    this.roll.position.copy(k.clone().add(sd.clone().multiplyScalar(0.33)).add(V(0, sd.z, -sd.y).multiplyScalar(0.07)));
+    const piv = V(0.25, 0.53, 0.35), d = this.roll.position.clone().add(V(0.17, 0, 0)).sub(piv);
+    this.lever.scale.set(1, d.length(), 1); this.lever.position.copy(piv.clone().add(d.clone().multiplyScalar(0.5))); this.lever.quaternion.setFromUnitVectors(V(0, 1, 0), d.normalize());
+    setMuscle(p);
+  },
+};
+EX.legcurl = {
+  muscles: [['hamstrings'], ['glutes', 'calves']], cam: { dir: V(1, 0.4, 0.3), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [0.9, 0, 1], [0.35, 1, 1], [1.3, 1, 0]]),
+  setup() {
+    const g = new THREE.Group();
+    g.add(padBetween(V(0, 0.55, -0.55), V(0, 0.55, 0.85), 0.34, 0.09));
+    for (const z of [-0.45, 0.7]) { g.add(box(0.06, 0.48, 0.06, M.frame, V(0, 0.24, z))); g.add(box(0.5, 0.04, 0.07, M.frame, V(0, 0.02, z))); }
+    g.add(box(0.5, 0.03, 0.03, M.steel, V(0, 0.42, 0.62)));
+    scene.add(this.bench = shadowed(g));
+    this.roll = cyl(0.045, 0.34, M.leather, 24); this.roll.rotation.z = Math.PI / 2; scene.add(shadowed(this.roll));
+  },
+  fit() { return [this.bench]; },
+  pose(p) {
+    setHips(V(0, 0.66, -0.08), qE(Math.PI / 2 - 0.04)); rotLocal('neck', -0.35);
+    for (const [s, sx] of SIDES) {
+      const knee = V(sx * 0.12, 0.6, -0.47), ang = lerp(0.05, 1.75, p);
+      const ank = knee.clone().add(V(0, Math.sin(ang), -Math.cos(ang)).multiplyScalar(0.39));
+      const sd = ank.clone().sub(knee).normalize(), heel = V(0, -sd.z, sd.y);
+      leg(s, ank, V(0, -1, 0.2), heel.clone().negate().add(sd.clone().multiplyScalar(0.3)).normalize(), sd);
+      grip(s, V(sx * 0.24, 0.43, 0.62), V(0, -0.3, -1), V(sx, 0.3, 0));
+    }
+    const k = V(0, 0.6, -0.47), ang = lerp(0.05, 1.75, p), sd = V(0, Math.sin(ang), -Math.cos(ang));
+    this.roll.position.copy(k.clone().add(sd.clone().multiplyScalar(0.33)).add(V(0, -sd.z, sd.y).multiplyScalar(0.075)));
+    setMuscle(p);
+  },
+};
+EX.calfseated = {
+  muscles: [['calves'], []], cam: { dir: V(1, 0.25, 0.4), fov: 28 },
+  tl: timeline([[0.35, 0, 0], [0.8, 0, 1], [0.5, 1, 1], [1.1, 1, 0]]),
+  setup() {
+    const g = new THREE.Group();
+    g.add(padBetween(V(0, 0.47, -0.25), V(0, 0.47, 0.2), 0.36, 0.09));
+    g.add(box(0.06, 0.42, 0.06, M.frame, V(0, 0.21, 0))); g.add(box(0.5, 0.04, 0.07, M.frame, V(0, 0.02, 0)));
+    g.add(box(0.5, 0.09, 0.16, M.rubber, V(0, 0.045, 0.52)));
+    scene.add(this.seat = shadowed(g));
+    this.bar = barbell(0.2); scene.add(this.bar);
+  },
+  fit() { return [this.seat, this.bar]; },
+  pose(p) {
+    setHips(V(0, 0.6, -0.1), qE(0.12)); rotLocal('neck', -0.05);
+    for (const [s, sx] of SIDES) {
+      const toe = V(sx * 0.14, 0.1, 0.56), heelUp = lerp(-0.42, 0.62, p);           // foot pitch about the ball of the foot
+      const fd = V(0, Math.sin(-heelUp), Math.cos(heelUp)).normalize();
+      const ank = toe.clone().sub(fd.clone().multiplyScalar(0.135)).add(V(0, 0.03, 0));
+      leg(s, ank, V(sx * 0.1, 0.6, 1), fd, V(0, Math.cos(heelUp), Math.sin(heelUp)));
+    }
+    const kn = wpos('LeftLeg').add(wpos('RightLeg')).multiplyScalar(0.5), bar = kn.clone().add(V(0, 0.1, -0.08));
+    for (const [s, sx] of SIDES) grip(s, bar.clone().add(V(sx * 0.28, 0, 0)), V(0, -0.6, 0.4), V(sx, 0, -0.6));
+    place(this.bar, bar, V(1, 0, 0)); setMuscle(p);
+  },
+};
+EX.pulldown = {
+  muscles: [['lats'], ['biceps', 'traps']], cam: { dir: V(1, 0.15, 0.5), fov: 30 },
+  tl: timeline([[0.3, 0, 0], [1.0, 0, 1], [0.3, 1, 1], [1.4, 1, 0]]),
+  setup() {
+    const g = new THREE.Group();
+    g.add(padBetween(V(0, 0.47, -0.25), V(0, 0.47, 0.2), 0.36, 0.09));
+    g.add(box(0.06, 0.42, 0.06, M.frame, V(0, 0.21, 0))); g.add(box(0.5, 0.04, 0.07, M.frame, V(0, 0.02, 0.2)));
+    g.add(box(0.1, 2.45, 0.1, M.frame, V(0, 1.22, 0.55))); g.add(box(0.1, 0.1, 0.6, M.frame, V(0, 2.42, 0.3)));
+    const kp = cyl(0.05, 0.42, M.leather, 24); kp.rotation.z = Math.PI / 2; kp.position.set(0, 0.67, 0.4); g.add(kp);
+    g.add(box(0.2, 0.6, 0.12, M.rubber, V(0, 0.4, 0.62))); g.add(pulley(V(0, 2.32, 0.1)));
+    scene.add(this.mach = shadowed(g));
+    this.bar = handleBar(1.15); scene.add(this.bar); this.cable = cableLine();
+  },
+  fit() { return [this.mach]; },
+  pose(p) {
+    setHips(V(0, 0.62, -0.08), qE(-0.2 * p - 0.05)); rotLocal('neck', 0.15 * p);
+    sitLegs(0.42, 0.15);
+    const pts = [];
+    for (const [s, sx] of SIDES) {
+      const top = V(sx * 0.4, 1.98, 0.08), bot = V(sx * 0.38, 1.42, 0.17);
+      grip(s, vlerp(top, bot, p), V(0, 0.1, 1), V(sx * 0.5, -1, -0.6)); pts.push(palm(s));
+    }
+    const c = pts[0].clone().add(pts[1]).multiplyScalar(0.5); place(this.bar, c, pts[0].clone().sub(pts[1]));
+    this.cable(V(0, 2.28, 0.1), c); setMuscle(p);
+  },
+};
+EX.cablerow = {
+  muscles: [['traps', 'lats'], ['biceps', 'forearms']], cam: { dir: V(1, 0.25, 0.3), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [1.0, 0, 1], [0.35, 1, 1], [1.3, 1, 0]]),
+  setup() {
+    const g = new THREE.Group();
+    g.add(padBetween(V(0, 0.32, -0.45), V(0, 0.32, 0.1), 0.32, 0.08));
+    g.add(box(0.5, 0.28, 0.06, M.frame, V(0, 0.14, -0.2)));
+    g.add(box(0.46, 0.34, 0.05, M.dark, V(0, 0.2, 0.62)));
+    g.add(box(0.1, 1.4, 0.1, M.frame, V(0, 0.7, 0.95))); g.add(box(0.2, 0.6, 0.12, M.rubber, V(0, 0.32, 1.02))); g.add(pulley(V(0, 0.72, 0.9)));
+    scene.add(this.mach = shadowed(g));
+    this.bar = handleBar(0.14); scene.add(this.bar); this.cable = cableLine();
+  },
+  fit() { return [this.mach]; },
+  pose(p) {
+    setHips(V(0, 0.44, -0.25), qE(lerp(0.32, -0.08, p))); rotLocal('neck', lerp(-0.25, 0.05, p));
+    for (const [s, sx] of SIDES) leg(s, V(sx * 0.14, 0.27, 0.53), V(sx * 0.15, 1, 0.3), V(0, 0.5, -0.86 * 0 + 0.3).normalize().add(V(0, 0, 0)), V(0, 0, -1));
+    const pts = [];
+    for (const [s, sx] of SIDES) {
+      const ext = V(sx * 0.05, 0.72, 0.52), pull = V(sx * 0.07, 0.75, 0.08);
+      grip(s, vlerp(ext, pull, p), V(-sx, 0, 0), V(sx * 0.2, -0.3, -1)); pts.push(palm(s));
+    }
+    const c = pts[0].clone().add(pts[1]).multiplyScalar(0.5); place(this.bar, c, pts[0].clone().sub(pts[1]));
+    this.cable(V(0, 0.72, 0.9), c); setMuscle(p);
+  },
+};
+EX.row = {
+  muscles: [['traps', 'lats'], ['biceps']], cam: { dir: V(1, 0.3, 0.35), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [0.9, 0, 1], [0.35, 1, 1], [1.3, 1, 0]]),
+  setup() { this.db = [dumbbell(), dumbbell()]; this.db.forEach((d) => scene.add(d)); }, fit() { return this.db; },
+  pose(p) {
+    setHips(V(0, 0.9, -0.15), qE(1.12)); rotLocal('neck', -0.55); rotLocal('Head', -0.2);
+    for (const [s, sx] of SIDES) leg(s, V(sx * 0.15, 0.095, 0.02), V(sx * 0.15, 0, 1), flatToe(sx, 0.15));
+    for (const [s, sx] of SIDES) {
+      const S = sho(s), down = S.clone().add(V(sx * 0.02, -0.58, 0.02)), up = S.clone().add(V(sx * 0.05, -0.14, -0.2));
+      const g = grip(s, vlerp(down, up, p), V(-sx, 0, 0), V(sx * 0.2, 0.4, -1));
+      place(this.db[s === 'L' ? 0 : 1], palm(s), g.axis);
+    }
+    setMuscle(p);
+  },
+};
+EX.facepull = {
+  muscles: [['delts'], ['traps', 'biceps']], cam: { dir: V(1, 0.3, 0.45), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [0.9, 0, 1], [0.4, 1, 1], [1.3, 1, 0]]),
+  setup() { cableStandSetup(this, V(0, 1.5, 0.95), 1.02); this.bar = handleBar(0.1); scene.add(this.bar); this.cab2 = cableLine(); },
+  fit() { return [this.col]; },
+  pose(p) {
+    setHips(V(0, 0.95, -0.05), qE(-0.06)); stand(0.16, -0.02);
+    const pts = [];
+    for (const [s, sx] of SIDES) {
+      const ext = V(sx * 0.07, 1.42, 0.6), pull = V(sx * 0.24, 1.52, 0.08);
+      grip(s, vlerp(ext, pull, p), V(-sx, -0.5, 0), V(sx, 0.4, -0.5)); pts.push(palm(s));
+    }
+    this.cable(this.pulleyP, pts[0]); this.cab2(this.pulleyP, pts[1]);
+    place(this.bar, this.pulleyP.clone().lerp(pts[0].clone().add(pts[1]).multiplyScalar(0.5), 0.15), V(1, 0, 0)); setMuscle(p);
+  },
+};
+EX.rdl = {
+  muscles: [['glutes', 'hamstrings'], ['lowerback']], cam: { dir: V(1, 0.2, 0.45), fov: 28 },
+  tl: timeline([[0.35, 0, 0], [1.5, 0, 1], [0.2, 1, 1], [1.1, 1, 0]]),
+  setup() { this.db = [dumbbell(), dumbbell()]; this.db.forEach((d) => scene.add(d)); }, fit() { return this.db; },
+  pose(p) {
+    setHips(V(0, lerp(0.975, 0.93, p), lerp(-0.035, -0.22, p)), qE(1.18 * p)); rotLocal('neck', -0.35 * p);
+    for (const [s, sx] of SIDES) leg(s, V(sx * 0.13, 0.095, -0.02), V(sx * 0.05, 0, 1), flatToe(sx, 0.1));
+    for (const [s, sx] of SIDES) {
+      const g = grip(s, sho(s).add(V(sx * 0.0, -0.6, 0.05)), V(0, 0, -1), V(sx * 0.3, 0.3, -1));
+      place(this.db[s === 'L' ? 0 : 1], palm(s), g.axis);
+    }
+    setMuscle(1 - p);
+  },
+};
+EX.lunge = {
+  muscles: [['glutes', 'quads'], ['hamstrings']], cam: { dir: V(1, 0.2, 0.25), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [1.1, 0, 1], [0.2, 1, 1], [1.0, 1, 0]]),
+  setup() {}, fit() { return []; },
+  pose(p) {
+    setHips(V(0, lerp(0.93, 0.6, p), lerp(-0.02, 0.0, p)), qE(0.06));
+    leg('L', V(0.13, 0.095, 0.4), V(0.05, 0, 1), flatToe(1));
+    leg('R', V(-0.13, 0.15, -0.42), V(-0.05, -0.4, 1), V(-0.05, -1, 0.35).normalize(), V(0, 0.35, 1));
+    for (const [s, sx] of SIDES) relax(s, sho(s).add(V(sx * 0.07, -0.6, 0.02)), V(-sx, 0, 0), V(sx * 0.1, 0, -1));
+    setMuscle(p);
+  },
+};
+EX.bridge = {
+  muscles: [['glutes'], ['hamstrings']], cam: { dir: V(0.45, 0.5, 1), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [0.9, 0, 1], [0.6, 1, 1], [1.2, 1, 0]]),
+  setup() { scene.add(this.mat = mat_()); this.bar = barbell(0.225); scene.add(this.bar); }, fit() { return [this.bar, this.mat]; },
+  pose(p) {
+    const phi = lerp(0.05, 0.5, p), th = -Math.PI / 2 - phi, spine = V(0, Math.cos(th), Math.sin(th));
+    const anchor = V(0, 0.12, -0.12);
+    setHips(anchor.clone().sub(spine.clone().multiplyScalar(0.41)), qE(th)); rotLocal('neck', 0.2 + phi); rotLocal('Head', 0.1);
+    for (const [s, sx] of SIDES) leg(s, V(sx * 0.17, 0.095, 0.5), V(sx * 0.2, 1, 0.3), flatToe(sx, 0.1));
+    const fwd = V(0, -Math.sin(th), Math.cos(th));            // anterior (belly side)
+    const bar = wpos('Hips').add(fwd.clone().multiplyScalar(0.16)).add(V(0, 0, 0.04));
+    for (const [s, sx] of SIDES) grip(s, bar.clone().add(V(sx * 0.36, 0, 0)), V(0, -0.5, 0.6), V(sx, 0, -0.4));
+    place(this.bar, bar, V(1, 0, 0)); setMuscle(p);
+  },
+};
+EX.hangraise = {
+  muscles: [['abs'], ['quads']], cam: { dir: V(1, 0.1, 0.35), fov: 30 },
+  tl: timeline([[0.35, 0, 0], [1.1, 0, 1], [0.3, 1, 1], [1.3, 1, 0]]),
+  setup() {
+    const g = new THREE.Group(); g.add(cylBetween(V(-0.55, 2.42, 0), V(0.55, 2.42, 0), 0.016, M.steel));
+    for (const x of [-0.55, 0.55]) g.add(box(0.07, 2.5, 0.07, M.frame, V(x, 1.25, 0))), g.add(box(0.07, 0.05, 0.8, M.frame, V(x, 0.025, 0)));
+    scene.add(this.rig = shadowed(g));
+  },
+  fit() { return [this.rig]; },
+  pose(p) {
+    setHips(V(0, lerp(1.38, 1.42, p), lerp(-0.02, -0.06, p)), qE(-0.28 * p)); rotLocal('neck', 0.1);
+    for (const [s, sx] of SIDES) {
+      grip(s, V(sx * 0.26, 2.42, 0.0), V(0, 0, 1), V(sx, 0, -0.3));
+      const a = lerp(0.04, 1.55, p), hipJ = wpos(s === 'L' ? 'LeftUpLeg' : 'RightUpLeg');
+      leg(s, hipJ.clone().add(V(0, -Math.cos(a) * 0.76, Math.sin(a) * 0.76)), V(0, 0.2, 1), V(0, -Math.cos(a) * 0.4 - 0.6, Math.sin(a) + 0.3).normalize(), V(0, Math.sin(a), -Math.cos(a) + 0.2).normalize());
+    }
+    setMuscle(p);
+  },
+};
+EX.deadbug = {
+  muscles: [['abs'], ['quads']], cam: { dir: V(1, 0.6, 0.25), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [1.1, 0, 1], [0.35, 1, 1], [1.1, 1, 0]]),
+  setup() { scene.add(this.mat = mat_()); }, fit() { return [this.mat]; },
+  pose(p) {
+    setHips(V(0, 0.115, 0.22), qE(-Math.PI / 2)); rotLocal('neck', 0.15);
+    grip('L', vlerp(V(0.2, 0.66, -0.18), V(0.2, 0.2, -0.78), p), V(-1, 0, 0), V(1, 0.3, 0.3));
+    grip('R', V(-0.2, 0.66, -0.18), V(1, 0, 0), V(-1, 0.3, 0.3));
+    leg('L', V(0.12, 0.5, 0.62), V(0.1, 1, 0.1), V(0, 0.1, 1).normalize(), V(0, 1, 0));
+    leg('R', vlerp(V(-0.12, 0.5, 0.62), V(-0.12, 0.2, 0.98), p), V(-0.1, 1, 0.1), V(0, 0.2, 1).normalize(), V(0, 1, 0));
+    setMuscle(p);
+  },
+};
+EX.pushup = {
+  muscles: [['triceps', 'chest'], ['delts']], cam: { dir: V(1, 0.25, 0.3), fov: 28 },
+  tl: timeline([[0.3, 0, 0], [1.2, 0, 1], [0.15, 1, 1], [0.9, 1, 0]]),
+  setup() { scene.add(this.mat = mat_()); }, fit() { return [this.mat]; },
+  pose(p) {
+    const al = lerp(0.36, 0.1, p), th = Math.PI / 2 - al, spine = V(0, Math.sin(al), Math.cos(al));
+    const ankle = V(0, 0.1, -0.88);
+    setHips(ankle.clone().add(spine.clone().multiplyScalar(0.87)), qE(th)); rotLocal('neck', -0.25);
+    for (const [s, sx] of SIDES) {
+      leg(s, V(sx * 0.1, 0.1, -0.88), V(0, -1, 0.1), V(0, -1, -0.15).normalize(), V(0, 0.2, -1).normalize());
+      grip(s, V(sx * 0.14, 0.06, sho(s).z + 0.02), V(0, -1, 0), V(sx * 0.15, 0.3, -1));
+    }
+    setMuscle(p);
+  },
+};
+EX.twist = {
+  muscles: [['abs'], []], cam: { dir: V(0.6, 0.35, 1), fov: 28 },
+  tl: timeline([[0.15, 0, 0], [0.75, 0, 1], [0.15, 1, 1], [0.75, 1, 0]]),
+  setup() { scene.add(this.mat = mat_()); this.ball = new THREE.Mesh(new THREE.SphereGeometry(0.11, 32, 20), new THREE.MeshStandardMaterial({ color: 0x2a2a2e, roughness: 0.55 })); scene.add(shadowed(this.ball)); },
+  fit() { return [this.mat]; },
+  pose(p) {
+    const yaw = lerp(-0.42, 0.42, p);
+    setHips(V(0, 0.15, -0.05), qE(-0.62)); rotLocal('Spine02', 0, yaw * 0.35); rotLocal('Spine01', 0, yaw * 0.35); rotLocal('Spine', 0.1, yaw * 0.3); rotLocal('neck', 0.25, -yaw * 0.3);
+    for (const [s, sx] of SIDES) leg(s, V(sx * 0.11, 0.24, 0.5), V(sx * 0.3, 1, 0.2), V(sx * 0.1, -0.5, 1).normalize());
+    const top = wpos('Spine'), fw = V(Math.sin(yaw * 1.1), 0, Math.cos(yaw * 1.1)), c = top.clone().add(fw.clone().multiplyScalar(0.34)).add(V(0, -0.14, 0));
+    const lat = V(fw.z, 0, -fw.x);
+    for (const [s, sx] of SIDES) grip(s, c.clone().add(lat.clone().multiplyScalar(sx * 0.1)), lat.clone().multiplyScalar(-sx), V(sx, -0.6, -0.3));
+    this.ball.position.copy(c); setMuscle(0.5 + 0.5 * Math.abs(p - 0.5) * 2);
+  },
+};
+
+// ---------------- camera: fit body + equipment over the whole rep ----------------
+const FIT_BONES = ['Hips', 'Spine', 'head_end', 'headfront', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand',
+  'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
+function fitCamera(ex) {
+  const dir = ex.cam.dir.clone().normalize(), fov = ex.cam.fov, tanH = Math.tan(THREE.MathUtils.degToRad(fov / 2));
+  const fwd = dir.clone().negate(), right = fwd.clone().cross(V(0, 1, 0)).normalize(), up = right.clone().cross(fwd).normalize();
+  const pts = [];
+  for (let i = 0; i < 10; i++) {
+    resetPose(); ex.pose(ex.tl.at(i * ex.tl.total / 10), 0, 1 / 12); char.updateMatrixWorld(true);
+    for (const b of FIT_BONES) pts.push(wpos(b));
+    for (const o of ex.fit ? ex.fit() : []) { const bb = new THREE.Box3().setFromObject(o); for (let k = 0; k < 8; k++) pts.push(V(k & 1 ? bb.max.x : bb.min.x, k & 2 ? bb.max.y : bb.min.y, k & 4 ? bb.max.z : bb.min.z)); }
+  }
+  let r0 = 1e9, r1 = -1e9, u0 = 1e9, u1 = -1e9;
+  for (const p of pts) { const r = p.dot(right), u = p.dot(up); r0 = Math.min(r0, r); r1 = Math.max(r1, r); u0 = Math.min(u0, u); u1 = Math.max(u1, u); }
+  const pad = 0.09;                                   // body volume beyond the joints
+  r0 -= pad; r1 += pad; u0 -= pad * 0.6; u1 += pad * 1.2;
+  const avg = pts.reduce((a, p) => a.add(p), V()).multiplyScalar(1 / pts.length);
+  const ctr = right.clone().multiplyScalar((r0 + r1) / 2).add(up.clone().multiplyScalar((u0 + u1) / 2)).add(fwd.clone().multiplyScalar(avg.dot(fwd)));
+  let dist = 0;
+  for (const p of pts) {
+    const q = p.clone().sub(ctr), r = Math.abs(q.dot(right)) + pad, u = Math.abs(q.dot(up)) + pad, f = q.dot(fwd);
+    dist = Math.max(dist, Math.max(r, u) / tanH - f);
+  }
+  dist = Math.max(dist, Math.max(r1 - r0, u1 - u0) / 2 / tanH) * 1.04;
+  const cam = new THREE.PerspectiveCamera(fov, 1, 0.05, 40);
+  cam.position.copy(ctr.clone().add(dir.clone().multiplyScalar(dist))); cam.lookAt(ctr);
+  return cam;
+}
+
+// ---------------- render ----------------
+const out = document.createElement('canvas'); out.width = out.height = OUT;
+const octx = out.getContext('2d'); octx.imageSmoothingQuality = 'high';
+async function post(path, canvas, type = 'image/jpeg', q = 0.86) {
+  await fetch('/frame?path=' + encodeURIComponent(path), { method: 'POST', body: canvas.toDataURL(type, q) });
+}
+function frameAt(ex, cam, t, dt) {
+  resetPose();
+  ex.pose(ex.tl.at(t), t, dt);
+  char.updateMatrixWorld(true);
+  if (MUSCLE.u) MUSCLE.u.value = MUSCLE.level;
+  renderer.render(scene, cam);
+  octx.clearRect(0, 0, OUT, OUT);
+  octx.drawImage(renderer.domElement, 0, 0, OUT, OUT);
+  // fade the outer edge to pure black so the tile blends into the watch's black page
+  const m = OUT * 0.1;
+  for (const [x0, y0, x1, y1, rx, ry, rw, rh] of [[0, 0, m, 0, 0, 0, m, OUT], [OUT, 0, OUT - m, 0, OUT - m, 0, m, OUT],
+                                                  [0, 0, 0, m, 0, 0, OUT, m], [0, OUT, 0, OUT - m, 0, OUT - m, OUT, m]]) {
+    const g = octx.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    octx.fillStyle = g; octx.fillRect(rx, ry, rw, rh);
+  }
+}
+
+// modes:
+//   ?mode=strip&ex=<key>&n=6   one image with n stills across the rep (for reviewing a movement)
+//   ?mode=batch                 render every job in /jobs.json ([{ id, key, p: [muscles], s: [muscles] }])
+//                               to <id>/<n>.jpg, then POST a summary line per job
+async function renderJob(key, mp, ms, onFrame) {
+  const ex = EX[key];
+  if (!ex) throw new Error('unknown movement ' + key);
+  const before = new Set(scene.children);
+  ex.setup();
+  paintMuscles(mp && mp.length ? mp : ex.muscles[0], mp && mp.length ? (ms || []) : ex.muscles[1]);
+  const cam = fitCamera(ex);
+  const fps = Number(Q.get('fps') || 12), T = ex.tl.total, N = Math.round(T * fps), dt = 1 / fps;
+  for (let i = 0; i < N; i++) { resetPose(); ex.pose(ex.tl.at(i / fps), i / fps, dt); }   // settle the springs
+  await onFrame(ex, cam, { fps, T, N, dt });
+  for (const c of [...scene.children]) if (!before.has(c)) scene.remove(c);           // drop this exercise's equipment
+  return { frames: N, fps };
+}
+
+(async () => {
+  await loadChar();
+  const mode = Q.get('mode') || 'strip';
+  if (mode === 'batch') {
+    const jobs = await (await fetch('/jobs.json')).json();
+    for (const job of jobs) {
+      const r = await renderJob(job.key, job.p, job.s, async (ex, cam, { fps, N, dt }) => {
+        for (let i = 0; i < N; i++) { frameAt(ex, cam, i / fps, dt); await post(`${job.id}/${i}.jpg`, out); }
+      });
+      await log(JSON.stringify({ id: job.id, key: job.key, frames: r.frames, fps: r.fps }));
+    }
+  } else {
+    const name = Q.get('ex') || 'bench', k = Number(Q.get('n') || 6);
+    await renderJob(name, null, null, async (ex, cam, { T, dt }) => {
+      const strip = document.createElement('canvas'); strip.width = OUT * k; strip.height = OUT;
+      const sc = strip.getContext('2d');
+      for (let i = 0; i < k; i++) { frameAt(ex, cam, (i / k) * T, dt); sc.drawImage(out, i * OUT, 0); }
+      await post(`strip-${name}.png`, strip, 'image/png');
+    });
+  }
+  await fetch('/done', { method: 'POST' });
+})();
+</script>

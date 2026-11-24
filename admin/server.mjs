@@ -7,7 +7,8 @@ import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { decode, darkBackground, frameImages } from './gif.mjs';
-import { MOTIONS, motionInfo } from './motion-map.mjs';
+import { MOTIONS, RENDERED, motionInfo } from './motion-map.mjs';
+import { renderJobs, RENDER_STYLE } from '../tools/render3d/render.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATASET = process.env.DATASET || path.join(ROOT, 'dataset');
@@ -39,7 +40,7 @@ async function loadLibrary() {
     const mo = motionInfo({ ...e, name: cleanName(e.name) });
     motionById.set(e.id, mo);
     return {
-      motion: mo.m,         // auto-matched vector movement, or null
+      motion: mo.m,         // auto-matched movement key, or null (3D if it's in RENDERED)
       id: e.id,
       name: cleanName(e.name),
       target: e.target || '',
@@ -127,50 +128,82 @@ function validatePlan(plan) {
   return { version: 2, updatedAt: new Date().toISOString(), attribution: ATTRIBUTION, weekAnchor: anchor, weeks };
 }
 
-// Each exercise's animation is published as site/anim/<id>/<n>.png: one 180x180 PNG per frame,
-// with the white backdrop turned black. The watch page steps through them with JS, because some
-// watch browsers won't animate GIFs and watchOS downsamples big images (a tall sprite sheet came out
-// blurry). Frame timings go into plan.json `anim`.
-// Bump ANIM_STYLE whenever processing changes; every animation is then regenerated on the next Save.
+// Each exercise's animation is published as frames in site/anim/<id>/, played by the watch page with
+// JS timers (some watch browsers won't animate GIFs, and watchOS blurs big images, so: many small frames).
+//  - 3D (default): movements in RENDERED are rendered by tools/render3d (realistic character, equipment,
+//    target muscles glowing) to 360×360 JPEGs at 12 fps. Cached by movement + muscles + RENDER_STYLE.
+//  - raster fallback: no 3D movement, or the exercise is overridden to 'gif' → the dataset GIF with its
+//    white backdrop darkened, as 180×180 PNG frames. Bump ANIM_STYLE when that processing changes.
 const ANIM_STYLE = 'frames-dark-v1';
 const META = path.join(ANIM, 'meta.json');
 
-// Ids that the watch shows with the original (raster) animation: no vector movement, or overridden.
-function rasterIds(plan) {
-  const ids = new Set();
+// what the watch shows for each plan exercise: { id: { kind: '3d', key } | { kind: 'raster' } }
+function animPlan(plan) {
+  const out = {};
   for (const w of plan.weeks) for (const d of w.days) for (const x of d.exercises) {
-    if (x.mo === 'gif' || (!x.mo && !motionById.get(x.id)?.m)) ids.add(x.id);
+    const key = x.mo === 'gif' ? null : (x.mo || motionById.get(x.id)?.m);
+    out[x.id] = key && RENDERED.has(key) ? { kind: '3d', key } : { kind: 'raster' };
   }
-  return ids;
+  return out;
 }
 
-async function syncAnims(plan) {
+async function syncAnims(plan, onProgress = () => {}) {
   await mkdir(ANIM, { recursive: true });
-  const needed = rasterIds(plan);
+  const want = animPlan(plan);
   const entries = await readdir(ANIM, { withFileTypes: true });
   const existing = new Set(entries.filter((e) => e.isDirectory() && /^\d{4}$/.test(e.name)).map((e) => e.name));
-  let meta = { style: '', delays: {} };
+  let meta = {};
   try { meta = JSON.parse(await readFile(META, 'utf8')); } catch {}
-  const fresh = meta.style === ANIM_STYLE;
-  const delays = {};
-  let added = 0, removed = 0;
-  for (const id of needed) {
-    if (fresh && existing.has(id) && meta.delays[id]) { delays[id] = meta.delays[id]; continue; }
+  const old = meta.items || {}, items = {};
+  let added = 0, removed = 0, rendered = 0;
+
+  // 3D renders: one browser session for everything that's new or changed
+  const jobs = [];
+  for (const [id, w] of Object.entries(want)) {
+    if (w.kind !== '3d') continue;
+    const mi = motionById.get(id) || { p: [], s: [] }, sig = [w.key, mi.p.join('+'), mi.s.join('+'), RENDER_STYLE].join('|');
+    const o = old[id];
+    if (o && o.kind === '3d' && o.sig === sig && existing.has(id)) { items[id] = o; continue; }
+    await rm(path.join(ANIM, id), { recursive: true, force: true });
+    jobs.push({ id, key: w.key, p: mi.p, s: mi.s, sig });
+  }
+  if (jobs.length) {
+    onProgress(`rendering ${jobs.length} 3D animation${jobs.length === 1 ? '' : 's'}`);
+    const res = await renderJobs(jobs.map(({ sig, ...j }) => j), ANIM, { onLog: (m) => { try { const j = JSON.parse(m); if (j.id) onProgress(`rendered ${j.id} (${j.key})`); } catch {} } });
+    for (const j of jobs) {
+      const r = res[j.id];
+      if (!r) throw new Error(`3D render produced nothing for ${j.id} (${j.key})`);
+      items[j.id] = { kind: '3d', sig: j.sig, n: r.frames, ms: Math.round(1000 / r.fps), ext: 'jpg', v: Date.now().toString(36) };
+      if (!existing.has(j.id)) added++;
+      rendered++;
+    }
+  }
+
+  // raster fallback
+  for (const [id, w] of Object.entries(want)) {
+    if (w.kind !== 'raster') continue;
+    const o = old[id];
+    if (o && o.kind === 'raster' && o.style === ANIM_STYLE && existing.has(id)) { items[id] = o; continue; }
     const { frames, delays: d } = frameImages(darkBackground(decode(await readFile(gifById.get(id)))));
     const dir = path.join(ANIM, id);
     await rm(dir, { recursive: true, force: true });
     await mkdir(dir);
     for (let i = 0; i < frames.length; i++) await writeFile(path.join(dir, `${i}.png`), frames[i]);
-    delays[id] = d;
+    items[id] = { kind: 'raster', style: ANIM_STYLE, delays: d, ext: 'png', v: Date.now().toString(36) };
     if (!existing.has(id)) added++;
   }
-  for (const id of existing) {
-    if (!needed.has(id)) { await rm(path.join(ANIM, id), { recursive: true, force: true }); removed++; }
+
+  for (const id of existing) if (!want[id]) { await rm(path.join(ANIM, id), { recursive: true, force: true }); removed++; }
+  for (const e of entries) if (e.isFile() && e.name.endsWith('.png')) await unlink(path.join(ANIM, e.name)); // old sprite sheets
+  await writeFile(META, JSON.stringify({ items }) + '\n');
+
+  // what the watch needs: per-id frame delays, file extension and cache tag
+  const anim = {}, animExt = {}, animVer = {};
+  for (const [id, it] of Object.entries(items)) {
+    anim[id] = it.kind === '3d' ? Array(it.n).fill(it.ms) : it.delays;
+    animExt[id] = it.ext; animVer[id] = it.v;
   }
-  // leftovers from older formats (e.g. anim/<id>.png sprite sheets)
-  for (const e of entries) if (e.isFile() && e.name.endsWith('.png')) await unlink(path.join(ANIM, e.name));
-  await writeFile(META, JSON.stringify({ style: ANIM_STYLE, delays }) + '\n');
-  return { added, removed, total: needed.size, delays };
+  return { added, removed, rendered, total: Object.keys(want).length, anim, animExt, animVer };
 }
 
 const git = (args) => new Promise((resolve) => {
@@ -190,7 +223,8 @@ const server = http.createServer(async (req, res) => {
     if (p.startsWith('/dataset/')) return serveFile(res, DATASET, p.slice('/dataset'.length));
 
     if (p === '/api/exercises' && req.method === 'GET') return send(res, 200, await loadLibrary());
-    if (p === '/api/motions' && req.method === 'GET') return send(res, 200, MOTIONS);
+    // movements available in the admin's per-exercise picker (the ones with a 3D animation)
+    if (p === '/api/motions' && req.method === 'GET') return send(res, 200, Object.fromEntries(Object.entries(MOTIONS).filter(([k]) => RENDERED.has(k))));
 
     if (p === '/api/plan' && req.method === 'GET') {
       const txt = existsSync(PLAN) ? await readFile(PLAN, 'utf8') : '{"version":1,"days":[]}';
@@ -200,14 +234,13 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/plan' && req.method === 'PUT') {
       await loadLibrary();
       const plan = validatePlan(JSON.parse(await readBody(req)));
-      const { delays, ...gifs } = await syncAnims(plan);
-      plan.anim = delays;       // { id: [ms per frame] }, read by the watch page
-      plan.animV = ANIM_STYLE;  // cache-buster for anim/<id>/<n>.png (served with a 1-week max-age)
-      // vector movement + muscles per exercise (drawn by the watch page's Motion library)
-      plan.motion = {};
-      for (const w of plan.weeks) for (const d of w.days) for (const x of d.exercises) plan.motion[x.id] = motionById.get(x.id);
+      const t0 = Date.now();
+      const { anim, animExt, animVer, ...gifs } = await syncAnims(plan, (m) => console.log('  ' + m));
+      plan.anim = anim;         // { id: [ms per frame] }
+      plan.animExt = animExt;   // { id: 'jpg' (3D) | 'png' (raster) }
+      plan.animVer = animVer;   // { id: cache tag } — frames are served with a 1-week max-age
       await writeFile(PLAN, JSON.stringify(plan, null, 2) + '\n');
-      return send(res, 200, { ok: true, updatedAt: plan.updatedAt, gifs });
+      return send(res, 200, { ok: true, updatedAt: plan.updatedAt, gifs, seconds: Math.round((Date.now() - t0) / 1000) });
     }
 
     if (p === '/api/publish' && req.method === 'POST') {
@@ -231,6 +264,8 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// a first Save can render many 3D animations (~10 s each): don't let Node cut the request off
+server.requestTimeout = 0; server.timeout = 0;
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`\n  WristPlan admin →  http://localhost:${PORT}\n`);
 });

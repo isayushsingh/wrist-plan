@@ -1,6 +1,6 @@
 # WristPlan
 
-**My trainer's workout plan on my Apple Watch: just the exercise name and a sharp, animated figure doing the movement, with the target muscles lit up.**
+**My trainer's workout plan on my Apple Watch: just the exercise name and a realistic 3D animation of the movement, with the target muscles lit up.**
 It's free, has no app to install, and does no tracking.
 
 ![WristPlan on Apple Watch: day list, exercise screens and the done screen](docs/watch.png)
@@ -35,7 +35,7 @@ A **static web page** built for a watch-sized screen, hosted free on **Vercel** 
 │ Admin portal (Node, 0 dep)│ ──git push─▶│ site/  (static)  │ ────────▶ │ watch browser         │
 │ search 1,324 exercises    │             │  index.html      │           │ (Ant / Fern / …),     │
 │ build Week A / Week B     │             │  plan.json       │           │ bookmarked            │
-│ rename for the watch      │             │  anim/<id>/*.png │           │ cached for offline    │
+│ render 3D animations      │             │  anim/<id>/*.jpg │           │ cached for offline    │
 └──────────────────────────┘             └──────────────────┘           └──────────────────────┘
 ```
 
@@ -51,7 +51,7 @@ A **static web page** built for a watch-sized screen, hosted free on **Vercel** 
 | | |
 |---|---|
 | **Home** | Week A / Week B tabs, with a dot for the current week. The day after the one I did last is highlighted as **Up next**. |
-| **Exercise** | A vector figure doing the movement, with the target muscles glowing as they contract, plus the name and *Day · n of N*. A progress bar sits at the top. |
+| **Exercise** | A realistic 3D man doing the movement with real equipment, the target muscles glowing as they contract, plus the name and *Day · n of N*. A progress bar sits at the top. |
 | **Controls** | Tap the right ⅔ of the screen for next, the left ⅓ for previous, or swipe. The ‹ button goes back to the days. |
 | **Done** | A check animation, then what's next: the next day, or the first day of next week. |
 
@@ -65,12 +65,12 @@ A **static web page** built for a watch-sized screen, hosted free on **Vercel** 
 
 ## Getting started
 
-Needs **Node 18+** and **git**.
+Needs **Node 18+**, **git**, and **Brave or Google Chrome** (used headless to render the 3D animations; rendering also loads three.js from a CDN, so it needs internet).
 
 ### 1. Run the admin
 
 ```bash
-npm run setup     # one-time: downloads the exercise library (~300 MB, not deployed)
+npm run setup     # one-time: downloads the exercise library (~300 MB) and the 3D character (~11 MB); neither is deployed
 npm run admin     # → http://localhost:4321
 ```
 
@@ -94,18 +94,19 @@ From then on, **Save & Publish** in the admin runs `git add site && git commit &
 | **A web page, not a watch app** | It's the only way to stay free and permanently installed. |
 | **Zero dependencies, no build step** | Both pages are single HTML files and the admin server is plain Node, so there's nothing to update or break. |
 | **Old-WebKit-safe watch page** | Watch browsers run limited WebKit, so the page uses ES5, XHR instead of `fetch`, no flex `gap` and no `aspect-ratio`. Sizes are in `vw` for 176–205 px screens. |
-| **Hand-built vector animations** | The dataset's animations are 180 px rasters. The watch had to upscale them, so they always looked blurry, whether as GIFs, a sprite sheet or single frames. Instead, the watch page draws an SVG figure on a small inverse-kinematics rig: each movement is two key poses, the figure eases between them, equipment is drawn from its hands and feet, and the dataset's target and secondary muscles glow as they contract. It's sharp at any size and needs no downloads. 39 movements cover every exercise in my plan and about 76% of the library. |
-| **Raster fallback** | Anything without a movement (mostly stretches and cardio) shows the original animation. Save decodes it into 180×180 PNG frames with the white backdrop turned black, and JS flips between them, because some watch browsers won't play GIFs. |
+| **Rendered 3D animations** | The dataset's animations are 180 px rasters, so they always looked blurry on the watch. Instead, Save renders each exercise on the laptop: a realistic CC0 3D character, posed by an inverse-kinematics rig, lifts real 3D equipment (barbells, dumbbells, benches, cable stations, machines) with lifting tempo (slow lowering, a pause, a faster press), and the dataset's target and secondary muscles glow red as they contract. It's three.js running in headless Brave or Chrome, writing 360 px JPEG frames at 12 fps (twice the watch tile, so they're always sharp), about 370 KB per exercise. Renders are cached; only new or changed exercises are rendered on Save (~7 s each). 31 movements cover every exercise in my plan. |
+| **Raster fallback** | Anything without a 3D movement (mostly stretches and cardio), or set to "Original animation" in the admin, shows the original animation. Save decodes it into 180×180 PNG frames with the white backdrop turned black, and JS flips between them, because some watch browsers won't play GIFs. |
 | **Alternating weeks** | `plan.json` stores the weeks plus `weekAnchor`, the Monday Week A starts. Current week = weeks since the anchor, mod 2, so it never resets at month boundaries. |
 
 ```
 admin/server.mjs   local server: library API, plan validation, animation build, git publish
 admin/index.html   admin UI
-admin/motion-map.mjs  matches exercises to vector movements, muscles and equipment
+admin/motion-map.mjs  matches exercises to 3D movements, muscles and equipment
+tools/render3d/    the 3D renderer: render.html (three.js scene, rig, equipment, 31 movements) + render.mjs (headless-browser driver)
 admin/gif.mjs      zero-dep GIF decoder, backdrop darkening, per-frame PNG writer
-site/index.html    the watch page (what Vercel serves), including the vector animation engine
+site/index.html    the watch page (what Vercel serves)
 site/plan.json     the plan, written only by the admin
-site/anim/<id>/    PNG frames for exercises that use the original animation (generated)
+site/anim/<id>/    each exercise's frames: 3D renders (.jpg) or the original animation (.png), generated on Save
 scripts/setup.mjs  downloads the exercise dataset into ./dataset (gitignored)
 ```
 
@@ -113,5 +114,6 @@ scripts/setup.mjs  downloads the exercise dataset into ./dataset (gitignored)
 
 - Exercise animations © **[Gym visual](https://gymvisual.com/)**, from the [exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) by hasaneyldrm.
 - They're redistributed with permission at their original 180×180 size, with attribution required. The watch page keeps the credit line.
-- The vector figures and movements are original to WristPlan. Where the original animations are still used, WristPlan only recolours the white backdrop for the dark UI.
+- 3D character: "Man Base Mesh" from [Grab3D](https://grab3d.com/models/characters/man-base-character/), CC0 (public domain). The 3D movements, equipment and renders are original to WristPlan.
+- Where the original animations are still used, WristPlan only recolours the white backdrop for the dark UI.
 - This deployment is for **personal use**. Check Gym visual's terms before making anything like it public or commercial.

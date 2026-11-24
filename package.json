@@ -2,11 +2,12 @@
   "name": "wristplan",
   "version": "1.0.0",
   "private": true,
-  "description": "Minimal Apple Watch workout viewer + local admin portal",
+  "description": "Apple Watch workout viewer with rendered 3D exercise animations + a local admin portal",
   "type": "module",
   "scripts": {
     "setup": "node scripts/setup.mjs",
-    "admin": "node admin/server.mjs"
+    "admin": "node admin/server.mjs",
+    "strip": "node tools/render3d/render.mjs strip"
   },
   "engines": {
     "node": ">=18"

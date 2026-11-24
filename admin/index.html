@@ -424,7 +424,7 @@ function renderEditor() {
         <input class="label" value="${esc(x.label)}" placeholder="${esc(e ? pretty(e.name) : x.id)}" maxlength="60" spellcheck="false">
         <div class="tags">${tags}</div>
       </div>
-      <select class="anim" title="Animation on the watch: a drawn vector movement, or the original animation"></select>
+      <select class="anim" title="Animation on the watch: a rendered 3D movement, or the original animation"></select>
       <div class="actions">
         <button class="icon" data-a="up" title="Move up" ${i === 0 ? 'disabled' : ''}>${ICON.up}</button>
         <button class="icon" data-a="down" title="Move down" ${i === d.exercises.length - 1 ? 'disabled' : ''}>${ICON.down}</button>
@@ -438,11 +438,11 @@ function renderEditor() {
     r.querySelector('.label').oninput = (ev) => { x.label = ev.target.value; setDirty(); };
     // animation picker: auto-matched vector movement, a specific movement, or the original animation
     const sel_ = r.querySelector('.anim'), auto = e && e.motion;
-    sel_.add(new Option(`Auto · ${auto ? MOTIONS[auto] || auto : 'Original'}`, ''));
+    sel_.add(new Option(`Auto · ${auto && MOTIONS[auto] ? '3D ' + MOTIONS[auto] : 'Original'}`, ''));
     Object.entries(MOTIONS).sort((a, b) => a[1].localeCompare(b[1])).forEach(([k, v]) => sel_.add(new Option(v, k)));
     sel_.add(new Option('Original animation', 'gif'));
     sel_.value = x.mo || '';
-    const paint = () => sel_.classList.toggle('vec', x.mo ? x.mo !== 'gif' : !!auto);
+    const paint = () => sel_.classList.toggle('vec', x.mo ? x.mo !== 'gif' : !!(auto && MOTIONS[auto]));
     paint();
     sel_.onchange = () => { if (sel_.value) x.mo = sel_.value; else delete x.mo; paint(); setDirty(); };
     r.querySelector('[data-a=up]').onclick = () => { move(d.exercises, i, i - 1); setDirty(); renderAll(); };
@@ -561,16 +561,17 @@ async function api(url, opts) {
 }
 async function save() {
   const b = $('saveBtn'); b.disabled = true;
+  setStatus('Saving… new 3D animations take ~10 s each', 'dirty');
   try {
     const { ok, j } = await api('/api/plan', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(plan) });
-    if (!ok) { toast('Save failed: ' + j.error, { err: true }); return false; }
+    if (!ok) { setDirty(true); toast('Save failed: ' + j.error, { err: true }); return false; }
     plan.updatedAt = j.updatedAt; setDirty(false);
     $('preview').contentWindow.location.reload();
     const g = j.gifs, diff = [g.added && `+${g.added}`, g.removed && `−${g.removed}`].filter(Boolean).join(' ');
-    toast(`Saved · ${plural(g.total, 'animation')}${diff ? ` (${diff})` : ''}`);
+    toast(`Saved · ${plural(g.total, 'animation')}${diff ? ` (${diff})` : ''}${g.rendered ? ` · rendered ${g.rendered} in 3D (${j.seconds} s)` : ''}`);
     return true;
   } catch (err) {
-    toast('Save failed: is the admin server running?', { err: true }); return false;
+    setDirty(true); toast('Save failed: is the admin server running?', { err: true }); return false;
   } finally { b.disabled = false; }
 }
 $('saveBtn').onclick = save;

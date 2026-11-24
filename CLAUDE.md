@@ -12,18 +12,23 @@ The owner uses it at the gym. The watch shows only the **exercise name and a loo
 ```
 admin/server.mjs   Node http server, zero deps, binds 127.0.0.1:4321 (PORT env)
 admin/index.html   admin UI (vanilla JS, single file)
-admin/motion-map.mjs  MOTIONS (key → label) + name rules mapping dataset exercises to vector movements, dataset muscles → figure muscles, equipment → held prop
+admin/motion-map.mjs  MOTIONS (key → label), RENDERED (keys with a 3D animation), name rules mapping dataset exercises to movements, dataset muscles → render muscles, equipment
+tools/render3d/render.html  three.js scene (CDN three@0.160.0): CC0 character, IK rig, equipment, EX[key] movements, muscle shader; modes ?mode=strip&ex=<key> and ?mode=batch
+tools/render3d/render.mjs   zero-dep driver: serves render.html + man.glb to headless Brave/Chrome (SwiftShader WebGL), feeds /jobs.json, writes POSTed frames; renderJobs(), RENDER_STYLE
+tools/render3d/man.glb      CC0 "Man Base Mesh" (Grab3D), 11 MB, gitignored, downloaded by npm run setup
 admin/gif.mjs      zero-dep GIF decoder + darkBackground() (white backdrop → #000) + frameImages() (one indexed PNG per frame); also a GIF encoder, currently unused
 site/              deployed as-is (vercel.json → outputDirectory: "site", no build)
-  index.html       watch UI (vanilla JS, single file, ES5-ish for old WebKit); first <script> is the `Motion` vector-animation library
+  index.html       watch UI (vanilla JS, single file, ES5-ish for old WebKit)
   plan.json        source of truth, written only by admin Save
-  anim/<id>/<n>.png  raster fallback frames (180×180 each), only for plan exercises shown with the original animation (no vector movement, or overridden to 'gif')
-  anim/meta.json   processing version + frame delays cache; if its style differs from ANIM_STYLE in server.mjs, every animation is regenerated on the next Save
+  anim/<id>/<n>.jpg  3D-rendered frames (360×360, 12 fps), for plan exercises whose movement is in RENDERED
+  anim/<id>/<n>.png  raster fallback frames (180×180), for exercises with no 3D movement or overridden to 'gif'
+  anim/meta.json   per-id cache: 3D {sig: key|muscles|RENDER_STYLE, n, ms} or raster {style: ANIM_STYLE, delays}; changed entries are regenerated on Save
 scripts/setup.mjs  shallow-clones the dataset into ./dataset (gitignored, ~300 MB)
 dataset/           github.com/hasaneyldrm/exercises-dataset
 ```
 
-Commands: `npm run setup` (one-time), `npm run admin` → http://localhost:4321
+Commands: `npm run setup` (one-time: dataset + 3D model), `npm run admin` → http://localhost:4321
+Review a movement while tuning it: `npm run strip -- <key> [outDir]` → strip-<key>.png with 6 stills across the rep.
 
 ## Data
 plan.json:
@@ -38,13 +43,13 @@ plan.json:
 - Day ids must be unique across all weeks, because `wp.lastDay` stores one. The server de-dupes them.
 - v1 plans (a top-level `days` array) are still accepted everywhere. The admin migrates one on load into Week A plus a copy as Week B; the watch treats it as a single week.
 - `id` is the 4-digit dataset id. `label` is the display name shown on the watch. `mo` (optional) overrides the animation: a movement key, or `"gif"` for the original raster animation.
-- Written by Save: `motion` (id → `{ m: movement key | null, eq: bb|db|kb|cable|machine|bw, p: [primary muscles], s: [secondary] }`), `anim` (id → raster frame delays) and `animV`.
+- Written by Save: `anim` (id → frame delays in ms), `animExt` (id → 'jpg' 3D | 'png' raster), `animVer` (id → cache tag; frames are served with a 1-week max-age). Older plans may still carry `motion`/`animV`; they're ignored.
 - Dataset `data/exercises.json` is an array of objects with `id, name, target, body_part, equipment, image (180px jpg), gif_url (180px gif)`. Some names contain the mojibake `в°`, which `cleanName()` turns into `°`.
 
 ## Admin server API
 - `GET /api/exercises`: slim library list, each with `motion` (auto-matched movement key or null)
-- `GET /api/motions`: movement key → label (for the admin's per-exercise "Animation" picker)
-- `GET|PUT /api/plan`: the PUT validates ids against the dataset (this also guards against path traversal), adds `motion`, builds or removes raster frames in site/anim (only where needed), adds `anim` (id → frame delays in ms) and `animV` (cache-buster) to the plan, and writes plan.json
+- `GET /api/motions`: movement key → label, only movements in RENDERED (the admin's per-exercise "Animation" picker)
+- `GET|PUT /api/plan`: the PUT validates ids against the dataset (this also guards against path traversal), runs `syncAnims()` (3D renders for new/changed exercises in one headless-browser session, raster frames for the rest, removes unused folders), adds `anim`/`animExt`/`animVer`, and writes plan.json. A first Save of 30 exercises takes ~3.5 min, so the server's request timeout is disabled.
 - `POST /api/publish`: `git add site && git commit && git push`. Vercel auto-deploys from GitHub.
 - `/preview/*` serves site/. The admin embeds it in a 198×242 iframe as the "watch preview".
 - `/dataset/*` serves dataset media. `serveFile` blocks paths that escape the base folder.
@@ -52,24 +57,29 @@ plan.json:
 ## Watch UI behaviour
 - Home: Week A / Week B tabs (a lime dot marks the calendar's current week; tapping the other only changes the view and resets when the page returns to the foreground), then that week's days. In the current week, the day after the last-opened day gets an accent outline and "Up next". The last-opened day is stored in localStorage (`wp.lastDay`); every storage call is wrapped in try/catch.
 - Exercise screen:
-  - **Vector animations (default).** The raster source is only 180px, and the watch upscales and resamples it, so it always looked blurry on the device. `Motion` (top of site/index.html) draws a stylised SVG figure instead, which stays sharp at any size:
-    - 2-bone IK rig: a pose gives the hip position, torso angle `t`, hand targets `a1/a2`, ankle targets `l1/l2`, and optional `hd` (head angle), `eb/kb` (elbow/knee bend side), `f1` (foot angle), `thf` (thigh foreshortening), `sg` (shrug). Angles use dir(a) = (sin a, cos a): 0 down, 90 right, 180 up, -90 left. Side-view figures face right.
-    - Each movement is two poses A and B plus `dur` [hold A, A→B, hold B, B→A] and `sq` (the pose where muscles contract). Views: 's' side, 'f' front, 't' top-down. Equipment is drawn from the joints in `eq()`.
-    - Muscles (`chest abs lats traps lowerback delts biceps triceps forearms glutes quads hamstrings calves`) are drawn as glowing strokes on body segments (MUS_S / MUS_F tables): primary brighter than secondary, both pulsing with contraction.
-    - Rendering pools SVG elements and updates attributes every 33 ms via setTimeout.
-    - **Adding a movement:** `def()` it in site/index.html *and* add its key + label to `MOTIONS` (and a name rule) in admin/motion-map.mjs.
+  - **3D animations (default).** The dataset's raster animations are only 180px, so they always looked blurry on the watch (GIF, sprite sheet and per-frame PNGs were all tried). Each exercise is instead rendered on the laptop by tools/render3d into 360×360 JPEG frames (2× the tile) and played by the same frame player.
+  - Earlier attempts, don't repeat: hand-drawn SVG vector figures (sharp, but the owner found them too crude) and the raw 180px media (blurry).
   - Raster fallback: the animation sits directly on the black page because its white backdrop is pre-darkened (see below).
   - **No GIFs on the watch.** Some watch browsers only show a GIF's first frame. All frames `anim/<id>/<n>.png?v=<animV>` are stacked as `<img>`s in the square `.tile`, and `setTimeout` flips which one has `.on`, using the `plan.anim[id]` delays. A frame that hasn't loaded yet is waited for, not skipped.
   - **Never one big image.** watchOS downsamples large images: a 180×2160 sprite sheet showed up blurry and blocky on a real watch. Keep every image at 180×180. Playback stops on home/done and while the page is hidden.
   - The name sits below the animation, with "Day · n of N" underneath.
   - Segmented progress bar at the top.
   - Invisible tap zones: the left 34% goes to the previous exercise, the right 66% to the next. Swipe also works. On the first exercise, "previous" only nudges; the ‹ button leaves.
-  - Opening a day preloads every raster frame of that day (vectors need no download), so a dropped connection mid-workout still works.
-  - The tile is square, sized `60vh` and capped at 180px (never upscaled). `.name` is wrapped in a plain div because line-clamp breaks on flex items.
+  - Opening a day preloads every frame of that day's exercises (~370 KB per 3D exercise), so a dropped connection mid-workout still works.
+  - The tile is square, sized `60vh` and capped at 180px CSS (3D frames are 360px, so they're downscaled, never upscaled). `.name` is wrapped in a plain div because line-clamp breaks on flex items.
 - After the last exercise, a "<Day> done" screen appears, showing the next day (or the next week's first day after a week's last day). Taps within 600ms are ignored, and a tap after that returns home.
 - Old-WebKit safety: no flex `gap`, no `aspect-ratio`, no `fetch` (XHR), no arrow functions or `const`.
 - plan.json is fetched with a cache-busting query. The last good copy is cached in localStorage (`wp.plan`) as an offline fallback; home shows "Offline · saved plan" when that copy is in use. It refetches on `visibilitychange` while on the home screen.
 - Sizing uses vw units throughout for small watch viewports. The design target is roughly 184–205px wide.
+
+## 3D renderer (tools/render3d)
+- Character: CC0 "Man Base Mesh" (T-shirt + shorts, 24 bones: Hips → Spine02 → Spine01 → Spine → neck → Head; Left/Right Shoulder, Arm, ForeArm, Hand; UpLeg, Leg, Foot, ToeBase). Metres, faces +Z, character's left = +X. No finger bones.
+- `curlFingers()` bends the hand mesh into a grip (three joints per finger, thumb outside the finger span curls less) using each vertex's real skinning matrix. Never read `.array` of skin attributes directly: they're interleaved, use getX/getY/getZ/getW.
+- Posing: `setHips(pos, bodyQ)`, `rotLocal(bone, x, y, z)`, `solveLimb()` analytic 2-bone IK with a pole (direction the elbow/knee points), `grip(side, point, palmNormal, pole)` (iterates so the palm lands on the point, wrist follows the forearm), `leg(side, ankle, pole, toeDir, up)`, `setHand`, `setFoot`. `palm(side)` = grip centre, where held equipment is placed.
+- Each EX[key]: `muscles` default, `cam: { dir, fov }` (auto-fit over the whole rep by `fitCamera`), `tl` timeline of [duration, from, to] segments with minimum-jerk easing (realistic tempo: slower lowering, pauses), `setup()` adds equipment to the scene, `fit()` returns objects the camera must include, `pose(p, t, dt)` with p = 0…1 through the rep, `setMuscle()` sets contraction for the glow.
+- Muscles are painted per vertex from the bind pose (bone segments + surface normal) and tinted in the material shader; intensity follows contraction. Names: chest abs lats traps lowerback delts biceps triceps forearms glutes quads hamstrings calves.
+- Output frames get a 10% black edge fade so the tile blends into the black page.
+- **Adding a movement:** add EX[key] in render.html, review it with the strip command, add the key to MOTIONS + RENDERED (+ a name rule) in motion-map.mjs. Bump RENDER_STYLE in render.mjs when changing anything that should re-render existing exercises.
 
 ## Raster fallback processing (admin Save)
 - `darkBackground()` flood-fills pure-white (≥254) pixels from the frame edges to black, then fades the light anti-aliased rim pixels toward black.
@@ -88,9 +98,9 @@ plan.json:
 - System font (SF). No frameworks, no build step. Keep both pages single-file.
 
 ## Constraints
-- The vector figures and movements are original to this project. Media © Gym visual (raster fallback, admin library) is redistributed with permission. Rules:
+- The 3D character is CC0; the 3D movements, equipment and renders are original to this project. Media © Gym visual (raster fallback, admin library) is redistributed with permission. Rules:
   - Keep the attribution visible.
-  - Keep the original 180×180 size (no upscaling).
+  - Keep the original 180×180 size (no upscaling) for the raster fallback.
   - Only the white backdrop is recoloured (for the dark UI); the figure and the animation are untouched.
   - The Vercel site is for personal use only.
 - Watch browsers have limited WebKit: avoid modern-only APIs on `site/index.html`, don't rely on service workers, and keep the page light.
@@ -107,7 +117,8 @@ plan.json:
     - Ant Browser on the watch showed GIFs as static images.
     - A single tall sprite sheet animated but came out blurry, because watchOS downsampled it.
     - Per-frame images were still blurry on the device: the 180px source is simply too small for the watch.
-  - Vector SVG animations with muscle highlights (2026-11-24): 39 movements, covering all 30 plan exercises and ~76% of the 1,324-exercise library; the rest (mostly stretches and cardio) fall back to raster. Not yet tested on the device.
+  - Vector SVG animations (2026-11-24), replaced the same day: the owner found them too crude.
+  - Realistic 3D rendered animations (2026-11-24): 31 movements, covering all 30 plan exercises; other library exercises fall back to raster. Not yet tested on the device.
   - UI polish pass (2026-11-24): admin has SVG icons, a watch-size switcher (41/45/49mm), `/` to focus search, a responsive layout, and keeps working when the dataset is missing
 - Not yet done:
   - Real-device test on an Apple Watch browser

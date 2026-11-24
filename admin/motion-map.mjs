@@ -1,12 +1,13 @@
-// Maps dataset exercises to the watch page's vector movements (the `Motion` library in
-// site/index.html). Keys and labels here must match the movements defined there.
+// Maps dataset exercises to movements. A movement listed in RENDERED has a 3D animation in
+// tools/render3d/render.html (EX[key]); other keys fall back to the original raster animation.
+// Keys here must match the EX keys there.
 
 export const MOTIONS = {
   bench: 'Bench press', 'bench-incline': 'Incline press', chestpress: 'Machine chest press',
   ohp: 'Shoulder press', arnold: 'Arnold press', lateral: 'Lateral raise', frontraise: 'Front raise',
   fly: 'Chest fly', crossover: 'Cable crossover', 'crossover-up': 'Low-to-high crossover',
   pushdown: 'Triceps pushdown', ohext: 'Overhead triceps extension', skull: 'Skull crusher',
-  curl: 'Biceps curl', preacher: 'Preacher curl',
+  curl: 'Biceps curl', 'curl-hammer': 'Hammer curl', preacher: 'Preacher curl',
   legext: 'Leg extension', legcurl: 'Leg curl', legpress: 'Leg press',
   calfseated: 'Seated calf raise', calfstand: 'Standing calf raise',
   pulldown: 'Lat pulldown', pullup: 'Pull-up', cablerow: 'Seated cable row', row: 'Bent-over row',
@@ -41,6 +42,7 @@ const RULES = [
   [/push ?down|press ?down/, 'pushdown'],
   [/overhead.*(triceps|extension)|triceps extension|tricep extension|french press|kickback/, 'ohext'],
   [/preacher|spider curl|concentration curl/, 'preacher'],
+  [/hammer curl/, 'curl-hammer'],
   [/curl/, 'curl'],
   [/lateral raise|side raise|lateral delt/, 'lateral'],
   [/front raise/, 'frontraise'],
@@ -71,6 +73,12 @@ function equipmentKey(eq) {
   if (/machine|lever|sled|assisted/.test(eq)) return 'machine';
   return 'bw';
 }
+
+// movements with a 3D render (EX in tools/render3d/render.html)
+export const RENDERED = new Set(['bench', 'bench-incline', 'chestpress', 'ohp', 'arnold', 'lateral', 'frontraise', 'fly',
+  'crossover-up', 'pushdown', 'ohext', 'skull', 'curl', 'curl-hammer', 'preacher', 'legext', 'legcurl', 'legpress',
+  'calfseated', 'pulldown', 'cablerow', 'row', 'facepull', 'rdl', 'squat', 'lunge', 'bridge', 'hangraise', 'deadbug',
+  'pushup', 'twist']);
 
 export function motionFor(name, equipment) {
   const n = name.toLowerCase(), eq = equipmentKey(equipment);
