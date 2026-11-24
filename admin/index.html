@@ -136,7 +136,7 @@
   .grip { color: var(--faint); cursor: grab; padding: 6px 2px; }
   .grip:active { cursor: grabbing; }
   .ord { color: var(--faint); width: 18px; text-align: center; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 600; }
-  .thumb { width: 64px; height: 64px; border-radius: 11px; background: #ececef; object-fit: cover; object-position: top; flex: none; }
+  .thumb { width: 64px; height: 64px; border-radius: 11px; background: #ececef; object-fit: contain; flex: none; }
   .exrow .info { flex: 1; min-width: 0; }
   .exrow .label { width: 100%; background: transparent; border: 1px solid transparent; padding: 5px 8px; margin-left: -1px; font-weight: 600; font-size: 15px; border-radius: 8px; }
   .exrow .label:hover { border-color: var(--line); background: transparent; }
@@ -417,7 +417,7 @@ function renderEditor() {
     r.innerHTML = `
       <span class="grip" title="Drag to reorder">${ICON.grip}</span>
       <span class="ord">${i + 1}</span>
-      <img class="thumb" src="${e ? '/dataset/' + e.image : '/preview/anim/' + x.id + '.png'}" alt="" loading="lazy">
+      <img class="thumb" src="${e ? '/dataset/' + e.image : '/preview/anim/' + x.id + '/0.png'}" alt="" loading="lazy">
       <div class="info">
         <input class="label" value="${esc(x.label)}" placeholder="${esc(e ? pretty(e.name) : x.id)}" maxlength="60" spellcheck="false">
         <div class="tags">${tags}</div>

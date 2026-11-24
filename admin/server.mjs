@@ -1,12 +1,12 @@
 // WristPlan admin server — runs only on your laptop (127.0.0.1). No dependencies.
 //   npm run admin   →   http://localhost:4321
 import http from 'node:http';
-import { readFile, writeFile, readdir, unlink, mkdir, stat } from 'node:fs/promises';
+import { readFile, writeFile, readdir, unlink, mkdir, stat, rm } from 'node:fs/promises';
 import { createReadStream, existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { decode, darkBackground, spriteSheet } from './gif.mjs';
+import { decode, darkBackground, frameImages } from './gif.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATASET = process.env.DATASET || path.join(ROOT, 'dataset');
@@ -119,17 +119,19 @@ function validatePlan(plan) {
   return { version: 2, updatedAt: new Date().toISOString(), attribution: ATTRIBUTION, weekAnchor: anchor, weeks };
 }
 
-// Each exercise's animation is published as site/anim/<id>.png: a vertical sprite sheet of all
-// frames with the white backdrop turned black. Watch browsers that won't animate GIFs still animate
-// these, because the page steps through frames with JS. Frame timings go into plan.json `anim`.
-// Bump ANIM_STYLE whenever processing changes; every sheet is then regenerated on the next Save.
-const ANIM_STYLE = 'sprite-dark-v1';
+// Each exercise's animation is published as site/anim/<id>/<n>.png: one 180x180 PNG per frame,
+// with the white backdrop turned black. The watch page steps through them with JS, because some
+// watch browsers won't animate GIFs and watchOS downsamples big images (a tall sprite sheet came out
+// blurry). Frame timings go into plan.json `anim`.
+// Bump ANIM_STYLE whenever processing changes; every animation is then regenerated on the next Save.
+const ANIM_STYLE = 'frames-dark-v1';
 const META = path.join(ANIM, 'meta.json');
 
 async function syncAnims(plan) {
   await mkdir(ANIM, { recursive: true });
   const needed = new Set(plan.weeks.flatMap((w) => w.days.flatMap((d) => d.exercises.map((x) => x.id))));
-  const existing = new Set((await readdir(ANIM)).filter((f) => f.endsWith('.png')).map((f) => f.slice(0, -4)));
+  const entries = await readdir(ANIM, { withFileTypes: true });
+  const existing = new Set(entries.filter((e) => e.isDirectory() && /^\d{4}$/.test(e.name)).map((e) => e.name));
   let meta = { style: '', delays: {} };
   try { meta = JSON.parse(await readFile(META, 'utf8')); } catch {}
   const fresh = meta.style === ANIM_STYLE;
@@ -137,14 +139,19 @@ async function syncAnims(plan) {
   let added = 0, removed = 0;
   for (const id of needed) {
     if (fresh && existing.has(id) && meta.delays[id]) { delays[id] = meta.delays[id]; continue; }
-    const sheet = spriteSheet(darkBackground(decode(await readFile(gifById.get(id)))));
-    await writeFile(path.join(ANIM, `${id}.png`), sheet.png);
-    delays[id] = sheet.delays;
+    const { frames, delays: d } = frameImages(darkBackground(decode(await readFile(gifById.get(id)))));
+    const dir = path.join(ANIM, id);
+    await rm(dir, { recursive: true, force: true });
+    await mkdir(dir);
+    for (let i = 0; i < frames.length; i++) await writeFile(path.join(dir, `${i}.png`), frames[i]);
+    delays[id] = d;
     if (!existing.has(id)) added++;
   }
   for (const id of existing) {
-    if (!needed.has(id)) { await unlink(path.join(ANIM, `${id}.png`)); removed++; }
+    if (!needed.has(id)) { await rm(path.join(ANIM, id), { recursive: true, force: true }); removed++; }
   }
+  // leftovers from older formats (e.g. anim/<id>.png sprite sheets)
+  for (const e of entries) if (e.isFile() && e.name.endsWith('.png')) await unlink(path.join(ANIM, e.name));
   await writeFile(META, JSON.stringify({ style: ANIM_STYLE, delays }) + '\n');
   return { added, removed, total: needed.size, delays };
 }
@@ -177,7 +184,7 @@ const server = http.createServer(async (req, res) => {
       const plan = validatePlan(JSON.parse(await readBody(req)));
       const { delays, ...gifs } = await syncAnims(plan);
       plan.anim = delays;       // { id: [ms per frame] }, read by the watch page
-      plan.animV = ANIM_STYLE;  // cache-buster for anim/<id>.png (served with a 1-week max-age)
+      plan.animV = ANIM_STYLE;  // cache-buster for anim/<id>/<n>.png (served with a 1-week max-age)
       await writeFile(PLAN, JSON.stringify(plan, null, 2) + '\n');
       return send(res, 200, { ok: true, updatedAt: plan.updatedAt, gifs });
     }

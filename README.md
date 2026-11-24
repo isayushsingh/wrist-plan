@@ -35,7 +35,7 @@ A **static web page** built for a watch-sized screen, hosted free on **Vercel** 
 │ Admin portal (Node, 0 dep)│ ──git push─▶│ site/  (static)  │ ────────▶ │ watch browser         │
 │ search 1,324 exercises    │             │  index.html      │           │ (Ant / Fern / …),     │
 │ build Week A / Week B     │             │  plan.json       │           │ bookmarked            │
-│ rename for the watch      │             │  anim/<id>.png   │           │ cached for offline    │
+│ rename for the watch      │             │  anim/<id>/*.png │           │ cached for offline    │
 └──────────────────────────┘             └──────────────────┘           └──────────────────────┘
 ```
 
@@ -94,17 +94,17 @@ From then on, **Save & Publish** in the admin runs `git add site && git commit &
 | **A web page, not a watch app** | It's the only way to stay free and permanently installed. |
 | **Zero dependencies, no build step** | Both pages are single HTML files and the admin server is plain Node, so there's nothing to update or break. |
 | **Old-WebKit-safe watch page** | Watch browsers run limited WebKit, so the page uses ES5, XHR instead of `fetch`, no flex `gap` and no `aspect-ratio`. Sizes are in `vw` for 176–205 px screens. |
-| **Sprite sheets instead of GIFs** | Some watch browsers only show a GIF's first frame. On Save, each GIF is decoded and turned into one tall PNG of all its frames, and the page steps through them with JS timers using the original frame timings. |
+| **Frame-by-frame PNGs instead of GIFs** | Some watch browsers only show a GIF's first frame, and watchOS blurs large images, so one tall sprite sheet came out blocky. On Save, each GIF is decoded into 180×180 PNG frames, and the page flips between them with JS timers using the original frame timings. |
 | **Black backdrop** | The source animations have white backgrounds. Save flood-fills the white backdrop to black from the frame edges, so the figure sits straight on the OLED screen while the machines' white frames stay white. |
 | **Alternating weeks** | `plan.json` stores the weeks plus `weekAnchor`, the Monday Week A starts. Current week = weeks since the anchor, mod 2, so it never resets at month boundaries. |
 
 ```
 admin/server.mjs   local server: library API, plan validation, animation build, git publish
 admin/index.html   admin UI
-admin/gif.mjs      zero-dep GIF decoder, backdrop darkening, sprite-sheet PNG writer
+admin/gif.mjs      zero-dep GIF decoder, backdrop darkening, per-frame PNG writer
 site/index.html    the watch page (what Vercel serves)
 site/plan.json     the plan, written only by the admin
-site/anim/         one sprite sheet per exercise in the plan (generated)
+site/anim/<id>/    PNG frames for each exercise in the plan (generated)
 scripts/setup.mjs  downloads the exercise dataset into ./dataset (gitignored)
 ```
 

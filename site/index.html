@@ -107,12 +107,10 @@
     position: relative; width: 60vh; height: 60vh; max-width: 180px; max-height: 180px;
     border-radius: 7vw; overflow: hidden; background: #000;
   }
-  /* the img is a vertical sprite sheet (one square frame per row); JS moves it up one tile per frame */
-  .tile img {
-    position: absolute; left: 0; top: 0; display: block; width: 100%; height: auto;
-    -webkit-transition: opacity .18s ease; transition: opacity .18s ease;
-  }
-  .tile.loading img { opacity: 0; }
+  /* one stacked 180x180 img per animation frame; JS shows one at a time (.on) */
+  .tile img { position: absolute; left: 0; top: 0; display: block; width: 100%; height: 100%; visibility: hidden; }
+  .tile img.on { visibility: visible; }
+  .tile.loading img { visibility: hidden; }
   .tile.missing { background: var(--card); }
   .tile.missing img { visibility: hidden; }
   .tile.missing:after {
@@ -177,7 +175,7 @@
     <div class="segs" id="segs"></div>
   </div>
   <div class="body" id="body">
-    <div class="stage"><div class="tile" id="tile"><img id="gif" alt=""></div></div>
+    <div class="stage"><div class="tile" id="tile"></div></div>
     <div class="info"><div><!-- wrapper keeps .name out of flex so line-clamp works -->
       <div class="name" id="name"></div>
       <div class="meta" id="meta"></div>
@@ -299,23 +297,48 @@
     }
   }
 
-  function animSrc(x) { return 'anim/' + x.id + '.png' + (plan.animV ? '?v=' + encodeURIComponent(plan.animV) : ''); }
+  function frameSrc(id, n) { return 'anim/' + id + '/' + n + '.png' + (plan.animV ? '?v=' + encodeURIComponent(plan.animV) : ''); }
+  function delaysOf(id) { return (plan.anim && plan.anim[id]) || [1000]; }
 
-  // Sprite player. Watch browsers may not animate GIFs, so frames are stepped with setTimeout.
-  // Moving the img by top:-n*100% works because the tile is square (top % is relative to its height).
-  var player = { timer: null, frame: 0, delays: null };
+  // Frame player. Watch browsers may not animate GIFs, and watchOS downsamples large images, so each
+  // frame is its own small PNG; all of them sit stacked in the tile and setTimeout flips which is visible.
+  var player = { timer: null, frame: 0, delays: [], imgs: [], id: null };
   function stopAnim() { if (player.timer) clearTimeout(player.timer); player.timer = null; }
-  function stepAnim() {
-    player.frame = (player.frame + 1) % player.delays.length;
-    $('gif').style.top = (-player.frame * 100) + '%';
-    player.timer = setTimeout(stepAnim, player.delays[player.frame]);
+  function showFrame(n) {
+    player.imgs[player.frame].className = '';
+    player.frame = n;
+    player.imgs[n].className = 'on';
   }
-  function playAnim(x) {
+  function stepAnim() {
+    var n = (player.frame + 1) % player.imgs.length, im = player.imgs[n];
+    if (!im.complete || !im.naturalWidth) { player.timer = setTimeout(stepAnim, 120); return; } // still loading
+    showFrame(n);
+    player.timer = setTimeout(stepAnim, player.delays[n]);
+  }
+  function playAnim() {
     stopAnim();
-    player.frame = 0;
-    player.delays = (plan.anim && plan.anim[x.id]) || [1000];
-    $('gif').style.top = '0';
-    if (player.delays.length > 1) player.timer = setTimeout(stepAnim, player.delays[0]);
+    if (!player.imgs.length) return;
+    showFrame(0);
+    if (player.imgs.length > 1) player.timer = setTimeout(stepAnim, player.delays[0]);
+  }
+  function loadAnim(id) {
+    stopAnim();
+    var tile = $('tile'), delays = delaysOf(id);
+    tile.innerHTML = ''; tile.classList.add('loading'); tile.classList.remove('missing');
+    player.id = id; player.delays = delays; player.imgs = []; player.frame = 0;
+    for (var n = 0; n < delays.length; n++) {
+      var im = document.createElement('img');
+      im.alt = '';
+      im.src = frameSrc(id, n);
+      tile.appendChild(im); player.imgs.push(im);
+    }
+    var first = player.imgs[0];
+    function ready() { if (player.id === id) { tile.classList.remove('loading'); playAnim(); } }
+    if (first.complete && first.naturalWidth) ready();
+    else {
+      first.onload = ready;
+      first.onerror = function () { if (player.id === id) { tile.classList.remove('loading'); tile.classList.add('missing'); } };
+    }
   }
 
   function openDay(i) {
@@ -330,18 +353,15 @@
     show('ex');
     // preload the whole day so it keeps working if the connection drops mid-workout
     keep = [];
-    for (var k = 1; k < d.exercises.length; k++) { var im = new Image(); im.src = animSrc(d.exercises[k]); keep.push(im); }
+    for (var k = 1; k < d.exercises.length; k++) {
+      var id = d.exercises[k].id, nf = delaysOf(id).length;
+      for (var f = 0; f < nf; f++) { var im = new Image(); im.src = frameSrc(id, f); keep.push(im); }
+    }
   }
 
   function renderEx(dir) {
-    var x = day.exercises[idx], tile = $('tile'), img = $('gif'), src = animSrc(x);
-    if (img.getAttribute('src') !== src) {
-      stopAnim();
-      tile.classList.add('loading'); tile.classList.remove('missing');
-      img.onload = function () { tile.classList.remove('loading'); playAnim(x); };
-      img.onerror = function () { stopAnim(); tile.classList.remove('loading'); tile.classList.add('missing'); };
-      img.src = src;
-    } else playAnim(x);
+    var x = day.exercises[idx];
+    if (player.id !== x.id) loadAnim(x.id); else playAnim();
     var label = x.label || x.id;
     $('name').textContent = label;
     $('name').className = 'name' + (label.length > 22 ? ' long' : '');
@@ -436,7 +456,7 @@
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { stopAnim(); return; }
     if (current() === 'home') { viewWk = -1; load(); renderHome(); }
-    else if (current() === 'ex' && day) playAnim(day.exercises[idx]);
+    else if (current() === 'ex' && day) playAnim();
   }, false);
 })();
 </script>

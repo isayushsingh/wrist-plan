@@ -229,12 +229,13 @@ export function darkBackground(gif, { hard = 254, soft = 200 } = {}) {
   return gif;
 }
 
-// ---------- sprite sheet ----------
-// Some watch browsers show only the first frame of a GIF. So the watch page animates a vertical
-// sprite sheet (all frames stacked, one 8-bit indexed PNG) with JS timers instead.
-// Returns { png: Buffer, delays: [ms per frame] }.
-export function spriteSheet(gif) {
-  const { width: w, height: fh } = gif;
+// ---------- frame images ----------
+// Some watch browsers show only the first frame of a GIF, and watchOS downsamples large images
+// (a tall sprite sheet came out blurry). So each frame is its own 180x180 8-bit indexed PNG,
+// all sharing one palette, and the watch page steps through them with JS timers.
+// Returns { frames: [png Buffer], delays: [ms per frame] }.
+export function frameImages(gif) {
+  const { width: w, height: h } = gif;
   // merge consecutive identical frames; browsers treat delays of 0–1 cs as 100 ms
   const frames = [];
   for (const f of gif.frames) {
@@ -257,22 +258,20 @@ export function spriteSheet(gif) {
     }
     index.set(k, best);
   }
-  const h = fh * frames.length, raw = Buffer.alloc((w + 1) * h); // filter byte 0 per row
-  frames.forEach((f, n) => {
-    for (let y = 0; y < fh; y++) for (let x = 0; x < w; x++) {
-      const o = (y * w + x) * 4;
-      raw[(n * fh + y) * (w + 1) + 1 + x] = index.get((f.rgba[o] << 16) | (f.rgba[o + 1] << 8) | f.rgba[o + 2]);
-    }
-  });
   const plte = Buffer.alloc(pal.length * 3);
   pal.forEach((k, i) => { plte[i * 3] = k >> 16; plte[i * 3 + 1] = (k >> 8) & 255; plte[i * 3 + 2] = k & 255; });
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 3; // 8-bit, indexed
-  const png = Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', ihdr), chunk('PLTE', plte), chunk('IDAT', zlib.deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0)),
-  ]);
-  return { png, delays: frames.map((f) => f.ms) };
+  const head = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('PLTE', plte)]);
+  const pngs = frames.map((f) => {
+    const raw = Buffer.alloc((w + 1) * h); // filter byte 0 per row
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const o = (y * w + x) * 4;
+      raw[y * (w + 1) + 1 + x] = index.get((f.rgba[o] << 16) | (f.rgba[o + 1] << 8) | f.rgba[o + 2]);
+    }
+    return Buffer.concat([head, chunk('IDAT', zlib.deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
+  });
+  return { frames: pngs, delays: frames.map((f) => f.ms) };
 }
 
 function sameRGB(a, b) {
