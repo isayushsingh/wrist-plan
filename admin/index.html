@@ -142,6 +142,8 @@
   .exrow .label:hover { border-color: var(--line); background: transparent; }
   .exrow .label:focus { background: var(--raise); border-color: var(--accent); }
   .tags { display: flex; gap: 6px; padding: 3px 8px 0; min-width: 0; overflow: hidden; }
+  .anim { flex: none; font-size: 12px; padding: 5px 26px 5px 9px; border-radius: 8px; max-width: 168px; background-position: right 9px center; text-transform: none; }
+  .anim.vec { color: var(--accent); border-color: rgba(199,244,100,.3); }
   .tag { font-size: 11px; color: var(--dim); background: var(--raise); border-radius: 6px; padding: 1px 7px; white-space: nowrap; }
   .tag.src { color: var(--faint); background: none; padding-left: 0; overflow: hidden; text-overflow: ellipsis; }
   .actions { display: flex; gap: 2px; opacity: .55; transition: opacity .15s; }
@@ -288,7 +290,7 @@ const ICON = {
   dumbbell: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>',
 };
 
-let LIB = [], BY_ID = new Map(), libError = null;
+let LIB = [], BY_ID = new Map(), libError = null, MOTIONS = {};
 let plan = { version: 2, weeks: [] };
 let wk = 0, sel = 0, dirty = false, shown = 120;
 
@@ -422,6 +424,7 @@ function renderEditor() {
         <input class="label" value="${esc(x.label)}" placeholder="${esc(e ? pretty(e.name) : x.id)}" maxlength="60" spellcheck="false">
         <div class="tags">${tags}</div>
       </div>
+      <select class="anim" title="Animation on the watch: a drawn vector movement, or the original animation"></select>
       <div class="actions">
         <button class="icon" data-a="up" title="Move up" ${i === 0 ? 'disabled' : ''}>${ICON.up}</button>
         <button class="icon" data-a="down" title="Move down" ${i === d.exercises.length - 1 ? 'disabled' : ''}>${ICON.down}</button>
@@ -433,6 +436,15 @@ function renderEditor() {
       r.onmouseleave = () => { img.src = '/dataset/' + e.image; };
     }
     r.querySelector('.label').oninput = (ev) => { x.label = ev.target.value; setDirty(); };
+    // animation picker: auto-matched vector movement, a specific movement, or the original animation
+    const sel_ = r.querySelector('.anim'), auto = e && e.motion;
+    sel_.add(new Option(`Auto · ${auto ? MOTIONS[auto] || auto : 'Original'}`, ''));
+    Object.entries(MOTIONS).sort((a, b) => a[1].localeCompare(b[1])).forEach(([k, v]) => sel_.add(new Option(v, k)));
+    sel_.add(new Option('Original animation', 'gif'));
+    sel_.value = x.mo || '';
+    const paint = () => sel_.classList.toggle('vec', x.mo ? x.mo !== 'gif' : !!auto);
+    paint();
+    sel_.onchange = () => { if (sel_.value) x.mo = sel_.value; else delete x.mo; paint(); setDirty(); };
     r.querySelector('[data-a=up]').onclick = () => { move(d.exercises, i, i - 1); setDirty(); renderAll(); };
     r.querySelector('[data-a=down]').onclick = () => { move(d.exercises, i, i + 1); setDirty(); renderAll(); };
     r.querySelector('[data-a=rm]').onclick = () => {
@@ -586,8 +598,9 @@ window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault()
 
 // ---------- boot ----------
 (async () => {
-  const [lib, p] = await Promise.allSettled([
+  const [lib, , p] = await Promise.allSettled([
     api('/api/exercises').then(({ ok, j }) => ok ? j : Promise.reject(new Error(j.error))),
+    api('/api/motions').then(({ ok, j }) => { if (ok) MOTIONS = j; }),
     api('/api/plan').then(({ ok, j }) => ok ? j : Promise.reject(new Error(j.error))),
   ]);
   if (lib.status === 'fulfilled') {

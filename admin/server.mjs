@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { decode, darkBackground, frameImages } from './gif.mjs';
+import { MOTIONS, motionInfo } from './motion-map.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATASET = process.env.DATASET || path.join(ROOT, 'dataset');
@@ -26,6 +27,7 @@ const MIME = {
 const cleanName = (s) => s.replace(/в°/g, '°').replace(/\s+/g, ' ').trim();
 let library = null;          // slim list sent to the browser
 const gifById = new Map();   // id -> absolute gif path
+const motionById = new Map(); // id -> { m: movement key | null, eq, p: [muscles], s: [muscles] }
 
 async function loadLibrary() {
   if (library) return library;
@@ -34,7 +36,10 @@ async function loadLibrary() {
   const raw = JSON.parse(await readFile(file, 'utf8'));
   library = raw.map((e) => {
     gifById.set(e.id, path.join(DATASET, e.gif_url));
+    const mo = motionInfo({ ...e, name: cleanName(e.name) });
+    motionById.set(e.id, mo);
     return {
+      motion: mo.m,         // auto-matched vector movement, or null
       id: e.id,
       name: cleanName(e.name),
       target: e.target || '',
@@ -109,7 +114,10 @@ function validatePlan(plan) {
           exercises: d.exercises.map((x) => {
             const xid = String(x.id);
             if (!/^\d{4}$/.test(xid) || !gifById.has(xid)) throw new Error(`Unknown exercise id: ${xid}`);
-            return { id: xid, label: String(x.label || '').slice(0, 60) };
+            const out = { id: xid, label: String(x.label || '').slice(0, 60) };
+            // optional animation override: a movement key, or 'gif' for the original animation
+            if (x.mo === 'gif' || MOTIONS[x.mo]) out.mo = x.mo;
+            return out;
           }),
         };
       }),
@@ -127,9 +135,18 @@ function validatePlan(plan) {
 const ANIM_STYLE = 'frames-dark-v1';
 const META = path.join(ANIM, 'meta.json');
 
+// Ids that the watch shows with the original (raster) animation: no vector movement, or overridden.
+function rasterIds(plan) {
+  const ids = new Set();
+  for (const w of plan.weeks) for (const d of w.days) for (const x of d.exercises) {
+    if (x.mo === 'gif' || (!x.mo && !motionById.get(x.id)?.m)) ids.add(x.id);
+  }
+  return ids;
+}
+
 async function syncAnims(plan) {
   await mkdir(ANIM, { recursive: true });
-  const needed = new Set(plan.weeks.flatMap((w) => w.days.flatMap((d) => d.exercises.map((x) => x.id))));
+  const needed = rasterIds(plan);
   const entries = await readdir(ANIM, { withFileTypes: true });
   const existing = new Set(entries.filter((e) => e.isDirectory() && /^\d{4}$/.test(e.name)).map((e) => e.name));
   let meta = { style: '', delays: {} };
@@ -173,6 +190,7 @@ const server = http.createServer(async (req, res) => {
     if (p.startsWith('/dataset/')) return serveFile(res, DATASET, p.slice('/dataset'.length));
 
     if (p === '/api/exercises' && req.method === 'GET') return send(res, 200, await loadLibrary());
+    if (p === '/api/motions' && req.method === 'GET') return send(res, 200, MOTIONS);
 
     if (p === '/api/plan' && req.method === 'GET') {
       const txt = existsSync(PLAN) ? await readFile(PLAN, 'utf8') : '{"version":1,"days":[]}';
@@ -185,6 +203,9 @@ const server = http.createServer(async (req, res) => {
       const { delays, ...gifs } = await syncAnims(plan);
       plan.anim = delays;       // { id: [ms per frame] }, read by the watch page
       plan.animV = ANIM_STYLE;  // cache-buster for anim/<id>/<n>.png (served with a 1-week max-age)
+      // vector movement + muscles per exercise (drawn by the watch page's Motion library)
+      plan.motion = {};
+      for (const w of plan.weeks) for (const d of w.days) for (const x of d.exercises) plan.motion[x.id] = motionById.get(x.id);
       await writeFile(PLAN, JSON.stringify(plan, null, 2) + '\n');
       return send(res, 200, { ok: true, updatedAt: plan.updatedAt, gifs });
     }
