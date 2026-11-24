@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "updatedAt": "2026-11-24T07:06:22.345Z",
+  "attribution": "© Gym visual — https://gymvisual.com/",
+  "days": [
+    {
+      "id": "push",
+      "name": "Push",
+      "exercises": [
+        {
+          "id": "0025",
+          "label": "Bench Press"
+        },
+        {
+          "id": "0314",
+          "label": "Incline DB Press"
+        },
+        {
+          "id": "0405",
+          "label": "Seated DB Shoulder Press"
+        },
+        {
+          "id": "0334",
+          "label": "Lateral Raise"
+        },
+        {
+          "id": "0241",
+          "label": "Triceps Pushdown"
+        }
+      ]
+    },
+    {
+      "id": "legs",
+      "name": "Legs",
+      "exercises": [
+        {
+          "id": "0043",
+          "label": "Back Squat"
+        },
+        {
+          "id": "0739",
+          "label": "Leg Press"
+        },
+        {
+          "id": "0585",
+          "label": "Leg Extension"
+        },
+        {
+          "id": "0586",
+          "label": "Lying Leg Curl"
+        },
+        {
+          "id": "0088",
+          "label": "Seated Calf Raise"
+        }
+      ]
+    },
+    {
+      "id": "pull",
+      "name": "Pull",
+      "exercises": [
+        {
+          "id": "0150",
+          "label": "Lat Pulldown"
+        },
+        {
+          "id": "0861",
+          "label": "Seated Cable Row"
+        },
+        {
+          "id": "0293",
+          "label": "DB Bent-Over Row"
+        },
+        {
+          "id": "0203",
+          "label": "Rear Delt Rope Row"
+        },
+        {
+          "id": "0313",
+          "label": "Hammer Curl"
+        }
+      ]
+    },
+    {
+      "id": "push2",
+      "name": "Push Volume",
+      "exercises": [
+        {
+          "id": "0577",
+          "label": "Machine Chest Press"
+        },
+        {
+          "id": "0308",
+          "label": "Dumbbell Fly"
+        },
+        {
+          "id": "2137",
+          "label": "Arnold Press"
+        },
+        {
+          "id": "1270",
+          "label": "Upper Chest Crossover"
+        },
+        {
+          "id": "0194",
+          "label": "Overhead Rope Extension"
+        }
+      ]
+    },
+    {
+      "id": "legs2",
+      "name": "Legs & Core",
+      "exercises": [
+        {
+          "id": "1459",
+          "label": "DB Romanian Deadlift"
+        },
+        {
+          "id": "1460",
+          "label": "Walking Lunge"
+        },
+        {
+          "id": "1409",
+          "label": "Barbell Glute Bridge"
+        },
+        {
+          "id": "0472",
+          "label": "Hanging Leg Raise"
+        },
+        {
+          "id": "0276",
+          "label": "Dead Bug"
+        }
+      ]
+    },
+    {
+      "id": "arms",
+      "name": "Arms",
+      "exercises": [
+        {
+          "id": "0294",
+          "label": "Dumbbell Curl"
+        },
+        {
+          "id": "0070",
+          "label": "Preacher Curl"
+        },
+        {
+          "id": "0060",
+          "label": "Skull Crusher"
+        },
+        {
+          "id": "0259",
+          "label": "Close-Grip Push-Up"
+        },
+        {
+          "id": "0687",
+          "label": "Russian Twist"
+        }
+      ]
+    }
+  ]
+}

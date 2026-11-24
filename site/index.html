@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+<title>WristPlan</title>
+<style>
+  :root {
+    --bg: #000;
+    --fg: #f5f5f7;
+    --dim: #8e8e93;
+    --faint: #2c2c2e;
+    --card: #141416;
+    --accent: #c7f464;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg); color: var(--fg); height: 100%; }
+  body {
+    font-family: -apple-system, "SF Pro Rounded", "SF Pro Text", system-ui, sans-serif;
+    font-size: 7vw;
+    -webkit-user-select: none; user-select: none;
+    overflow-x: hidden;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; text-align: left; }
+  .screen { display: none; min-height: 100vh; padding: 4vw 5vw 6vw; }
+  .screen.on { display: block; }
+
+  /* ---------- home ---------- */
+  .brand { font-size: 5vw; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin: 1vw 1vw 4vw; }
+  .day {
+    display: flex; align-items: center; gap: 3vw; width: 100%;
+    background: var(--card); border-radius: 6vw; padding: 4.5vw 5vw; margin-bottom: 2.5vw;
+  }
+  .day:active { background: #1f1f22; }
+  .day .n { font-size: 5vw; color: var(--dim); min-width: 6vw; font-variant-numeric: tabular-nums; }
+  .day .t { flex: 1; font-size: 7.5vw; font-weight: 600; line-height: 1.15; }
+  .day .c { font-size: 5vw; color: var(--dim); }
+  .day.next { box-shadow: inset 0 0 0 .6vw var(--accent); }
+  .day.next .n { color: var(--accent); }
+  .credit { font-size: 4vw; color: #48484a; text-align: center; margin-top: 5vw; }
+  .msg { color: var(--dim); font-size: 6vw; text-align: center; padding: 20vw 4vw; line-height: 1.4; }
+
+  /* ---------- exercise ---------- */
+  #ex { padding-top: 3vw; display: none; flex-direction: column; height: 100vh; }
+  #ex.on { display: flex; }
+  .bar { display: flex; align-items: center; gap: 2vw; margin-bottom: 3vw; }
+  .back { font-size: 9vw; line-height: 1; color: var(--accent); padding: 0 3vw 0 1vw; }
+  .segs { flex: 1; display: flex; gap: 1.2vw; }
+  .segs i { flex: 1; height: 1.4vw; border-radius: 1vw; background: var(--faint); }
+  .segs i.done { background: #5a5a5e; }
+  .segs i.cur { background: var(--accent); }
+  .tile {
+    position: relative; width: 100%; aspect-ratio: 1 / 1; max-height: 58vh;
+    margin: 0 auto; border-radius: 7vw; overflow: hidden;
+    background: #e9e9ec;
+  }
+  .tile img { width: 100%; height: 100%; object-fit: contain; display: block; filter: brightness(.94) contrast(1.04); }
+  .name {
+    font-size: 8vw; font-weight: 700; line-height: 1.12; text-align: center;
+    margin-top: 4vw; padding: 0 1vw;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .meta { font-size: 5vw; color: var(--dim); text-align: center; margin-top: 1.5vw; }
+  /* invisible tap zones over the whole exercise screen */
+  .zone { position: fixed; top: 18vw; bottom: 0; z-index: 2; }
+  .zone.prev { left: 0; width: 34%; }
+  .zone.next { right: 0; width: 66%; }
+
+  /* ---------- done ---------- */
+  #done { text-align: center; padding-top: 22vw; }
+  #done .tick { font-size: 26vw; color: var(--accent); line-height: 1; }
+  #done h2 { font-size: 9vw; margin-top: 4vw; }
+  #done p { color: var(--dim); font-size: 5.5vw; margin-top: 2vw; }
+</style>
+</head>
+<body>
+
+<section id="home" class="screen on">
+  <div class="brand">WristPlan</div>
+  <div id="days"><div class="msg">Loading…</div></div>
+  <div class="credit">Animations © Gym visual</div>
+</section>
+
+<section id="ex" class="screen">
+  <div class="bar">
+    <button class="back" id="backBtn" aria-label="Back">‹</button>
+    <div class="segs" id="segs"></div>
+  </div>
+  <div class="tile"><img id="gif" alt=""></div>
+  <div class="name" id="name"></div>
+  <div class="meta" id="meta"></div>
+  <button class="zone prev" id="prevZone" aria-label="Previous exercise"></button>
+  <button class="zone next" id="nextZone" aria-label="Next exercise"></button>
+</section>
+
+<section id="done" class="screen">
+  <div class="tick">✓</div>
+  <h2 id="doneTitle">Done</h2>
+  <p>Tap to go back</p>
+</section>
+
+<script>
+(function () {
+  var KEY_PLAN = 'wp.plan', KEY_LAST = 'wp.lastDay';
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  var $ = function (id) { return document.getElementById(id); };
+  var plan = null, day = null, idx = 0;
+
+  function show(id) {
+    ['home', 'ex', 'done'].forEach(function (s) { $(s).classList.toggle('on', s === id); });
+    window.scrollTo(0, 0);
+  }
+
+  function pretty(s) {
+    return s.replace(/\s*\((male|female)\)/gi, '').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  function renderHome() {
+    var box = $('days');
+    if (!plan || !plan.days || !plan.days.length) {
+      box.innerHTML = '<div class="msg">No plan yet.<br>Add days in the admin portal.</div>';
+      return;
+    }
+    var last = store.get(KEY_LAST);
+    var lastIdx = -1;
+    plan.days.forEach(function (d, i) { if (d.id === last) lastIdx = i; });
+    var nextIdx = lastIdx === -1 ? 0 : (lastIdx + 1) % plan.days.length;
+    box.innerHTML = '';
+    plan.days.forEach(function (d, i) {
+      var b = document.createElement('button');
+      b.className = 'day' + (i === nextIdx ? ' next' : '');
+      b.innerHTML = '<span class="n">' + (i + 1) + '</span><span class="t"></span><span class="c">' + d.exercises.length + '</span>';
+      b.querySelector('.t').textContent = d.name;
+      b.onclick = function () { openDay(i); };
+      box.appendChild(b);
+    });
+  }
+
+  function openDay(i) {
+    day = plan.days[i];
+    if (!day.exercises.length) return;
+    store.set(KEY_LAST, day.id);
+    idx = 0;
+    $('segs').innerHTML = day.exercises.map(function () { return '<i></i>'; }).join('');
+    renderEx();
+    show('ex');
+  }
+
+  function gifSrc(x) { return 'gifs/' + x.id + '.gif'; }
+
+  function renderEx() {
+    var x = day.exercises[idx];
+    $('gif').src = gifSrc(x);
+    $('name').textContent = x.label || pretty(x.name || '');
+    $('meta').textContent = day.name + ' · ' + (idx + 1) + ' of ' + day.exercises.length;
+    var segs = $('segs').children;
+    for (var i = 0; i < segs.length; i++) {
+      segs[i].className = i < idx ? 'done' : (i === idx ? 'cur' : '');
+    }
+    // preload the next animation so it appears instantly
+    var n = day.exercises[idx + 1];
+    if (n) { var im = new Image(); im.src = gifSrc(n); }
+  }
+
+  function next() {
+    if (idx < day.exercises.length - 1) { idx++; renderEx(); }
+    else { $('doneTitle').textContent = day.name + ' done'; show('done'); }
+  }
+  function prev() {
+    if (idx > 0) { idx--; renderEx(); } else { renderHome(); show('home'); }
+  }
+
+  $('nextZone').onclick = next;
+  $('prevZone').onclick = prev;
+  $('backBtn').onclick = function () { renderHome(); show('home'); };
+  $('done').onclick = function () { renderHome(); show('home'); };
+
+  // swipe left/right on the exercise screen
+  var sx = null;
+  $('ex').addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
+  $('ex').addEventListener('touchend', function (e) {
+    if (sx === null) return;
+    var dx = e.changedTouches[0].clientX - sx; sx = null;
+    if (Math.abs(dx) > 40) { dx < 0 ? next() : prev(); }
+  }, { passive: true });
+
+  // load plan: network first, fall back to the last copy we saw
+  var cached = store.get(KEY_PLAN);
+  if (cached) { try { plan = JSON.parse(cached); renderHome(); } catch (e) {} }
+
+  fetch('plan.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+    .then(function (txt) { plan = JSON.parse(txt); store.set(KEY_PLAN, txt); renderHome(); })
+    .catch(function () {
+      if (!plan) $('days').innerHTML = '<div class="msg">Couldn’t load plan.<br>Check connection.</div>';
+    });
+})();
+</script>
+</body>
+</html>

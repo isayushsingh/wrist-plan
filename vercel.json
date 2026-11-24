@@ -1,0 +1,9 @@
+{
+  "buildCommand": "",
+  "installCommand": "",
+  "outputDirectory": "site",
+  "headers": [
+    { "source": "/plan.json", "headers": [{ "key": "Cache-Control", "value": "no-store" }] },
+    { "source": "/gifs/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }] }
+  ]
+}

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WristPlan · Admin</title>
+<style>
+  :root {
+    --bg: #0b0b0c; --panel: #131315; --raise: #1a1a1d; --line: #26262a;
+    --fg: #ececef; --dim: #8b8b93; --faint: #55555c; --accent: #c7f464; --danger: #ff6b6b;
+    --r: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--fg); }
+  body { font: 14px/1.45 -apple-system, "SF Pro Text", Inter, system-ui, sans-serif; display: flex; flex-direction: column; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  input, select { font: inherit; color: var(--fg); background: var(--raise); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; outline: none; }
+  input:focus, select:focus { border-color: #3a3a40; }
+  ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-thumb { background: #2a2a2e; border-radius: 8px; }
+
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+  .logo { font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: 12px; }
+  .logo span { color: var(--accent); }
+  .status { color: var(--dim); font-size: 12px; margin-left: 6px; }
+  .status.dirty { color: #ffcc66; }
+  .spacer { flex: 1; }
+  .btn { padding: 8px 14px; border-radius: 9px; background: var(--raise); border: 1px solid var(--line); font-weight: 500; }
+  .btn:hover { border-color: #3a3a40; }
+  .btn.primary { background: var(--accent); color: #0b0b0c; border-color: var(--accent); font-weight: 600; }
+  .btn:disabled { opacity: .45; cursor: default; }
+
+  main { flex: 1; display: grid; grid-template-columns: 260px 1fr 440px; min-height: 0; }
+  section { min-height: 0; display: flex; flex-direction: column; }
+  section + section { border-left: 1px solid var(--line); }
+  .head { display: flex; align-items: center; gap: 8px; padding: 16px 18px 10px; }
+  .head h2 { font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); flex: 1; }
+  .scroll { overflow-y: auto; padding: 0 12px 16px; flex: 1; }
+  .icon { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--dim); }
+  .icon:hover { background: var(--raise); color: var(--fg); }
+
+  /* days */
+  .dayrow { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r); cursor: pointer; margin-bottom: 2px; }
+  .dayrow:hover { background: var(--panel); }
+  .dayrow.sel { background: var(--raise); }
+  .dayrow .num { width: 22px; color: var(--faint); font-variant-numeric: tabular-nums; font-size: 12px; }
+  .dayrow.sel .num { color: var(--accent); }
+  .dayrow .nm { flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dayrow .ct { color: var(--faint); font-size: 12px; }
+  .dayrow.drag-over { box-shadow: inset 0 2px 0 var(--accent); }
+
+  .watch { margin: 10px auto 18px; width: 214px; padding: 8px; border-radius: 52px; background: #1c1c1f; box-shadow: 0 0 0 1px #2a2a2e, 0 20px 40px #0008; }
+  .watch iframe { display: block; width: 198px; height: 242px; border: 0; border-radius: 44px; background: #000; }
+  .watch-cap { text-align: center; color: var(--faint); font-size: 11px; margin-bottom: 6px; }
+
+  /* editor */
+  .dayname { font-size: 22px; font-weight: 700; background: transparent; border: 0; border-bottom: 1px solid transparent; border-radius: 0; padding: 4px 0; width: 100%; }
+  .dayname:focus { border-bottom-color: var(--line); }
+  .ed-head { padding: 18px 24px 8px; display: flex; align-items: center; gap: 10px; }
+  .ed-sub { padding: 0 24px 12px; color: var(--dim); font-size: 12px; }
+  .exlist { padding: 0 16px 24px; overflow-y: auto; flex: 1; }
+  .exrow { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: var(--r); background: var(--panel); margin-bottom: 8px; border: 1px solid transparent; }
+  .exrow:hover { border-color: var(--line); }
+  .exrow.dragging { opacity: .4; }
+  .exrow.drag-over { box-shadow: inset 0 2px 0 var(--accent); }
+  .grip { color: var(--faint); cursor: grab; padding: 0 2px; font-size: 16px; user-select: none; }
+  .thumb { width: 64px; height: 64px; border-radius: 10px; background: #e9e9ec; object-fit: contain; flex: none; }
+  .exrow .info { flex: 1; min-width: 0; }
+  .exrow .label { width: 100%; background: transparent; border: 1px solid transparent; padding: 4px 6px; font-weight: 600; font-size: 15px; }
+  .exrow .label:hover { border-color: var(--line); }
+  .exrow .label:focus { background: var(--raise); border-color: #3a3a40; }
+  .exrow .orig { color: var(--faint); font-size: 12px; padding: 0 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .exrow .ord { color: var(--faint); width: 20px; text-align: center; font-variant-numeric: tabular-nums; }
+  .empty { color: var(--faint); text-align: center; padding: 60px 20px; line-height: 1.7; }
+
+  /* library */
+  .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 16px 12px; }
+  .filters input { grid-column: 1 / -1; }
+  .libcount { padding: 0 18px 8px; color: var(--faint); font-size: 12px; }
+  .grid { display: grid; grid-auto-rows: max-content; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 0 16px 20px; overflow-y: auto; flex: 1; align-content: start; }
+  .card { position: relative; border-radius: var(--r); background: var(--panel); border: 1px solid transparent; overflow: hidden; cursor: pointer; }
+  .card:hover { border-color: #3a3a40; }
+  .card img { width: 100%; aspect-ratio: 1; display: block; background: #e9e9ec; object-fit: contain; }
+  .card .cn { font-size: 12px; padding: 7px 8px 8px; line-height: 1.3; height: 46px; overflow: hidden; }
+  .card .add { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #0b0b0c; font-weight: 700; display: grid; place-items: center; opacity: 0; transition: opacity .12s; }
+  .card:hover .add { opacity: 1; }
+  .card.in::after { content: "✓ in day"; position: absolute; top: 6px; left: 6px; font-size: 10px; padding: 2px 6px; border-radius: 6px; background: #0b0b0ccc; color: var(--accent); }
+  .more { grid-column: 1 / -1; padding: 10px; }
+  .credit { padding: 8px 18px 12px; color: var(--faint); font-size: 11px; border-top: 1px solid var(--line); }
+  .credit a { color: var(--dim); }
+
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--raise); border: 1px solid var(--line); padding: 10px 16px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 70vw; white-space: pre-wrap; }
+  .toast.on { opacity: 1; }
+  .toast.err { border-color: var(--danger); color: var(--danger); }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Wrist<span>Plan</span> · Admin</div>
+  <div class="status" id="status">Loading…</div>
+  <div class="spacer"></div>
+  <button class="btn" id="saveBtn" title="Ctrl/Cmd + S">Save</button>
+  <button class="btn primary" id="publishBtn" title="Save, then git push → Vercel deploys">Save &amp; Publish</button>
+</header>
+
+<main>
+  <!-- days -->
+  <section>
+    <div class="head"><h2>Days</h2><button class="icon" id="addDay" title="Add day">＋</button></div>
+    <div class="scroll" id="dayList"></div>
+    <div class="watch-cap">Watch preview (saved plan)</div>
+    <div class="watch"><iframe id="preview" src="/preview/" title="Watch preview"></iframe></div>
+  </section>
+
+  <!-- editor -->
+  <section>
+    <div class="ed-head">
+      <input class="dayname" id="dayName" placeholder="Day name">
+      <button class="icon" id="delDay" title="Delete this day">🗑</button>
+    </div>
+    <div class="ed-sub" id="daySub"></div>
+    <div class="exlist" id="exList"></div>
+  </section>
+
+  <!-- library -->
+  <section>
+    <div class="head"><h2>Exercise library</h2></div>
+    <div class="filters">
+      <input id="q" placeholder="Search 1,300+ exercises… e.g. lat pulldown">
+      <select id="fEquip"><option value="">All equipment</option></select>
+      <select id="fTarget"><option value="">All muscles</option></select>
+    </div>
+    <div class="libcount" id="libCount"></div>
+    <div class="grid" id="grid"></div>
+    <div class="credit">Animations © <a href="https://gymvisual.com/" target="_blank" rel="noopener">Gym visual</a> · dataset by hasaneyldrm</div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let LIB = [], BY_ID = new Map();
+let plan = { version: 1, days: [] };
+let sel = 0, dirty = false, shown = 120;
+
+const pretty = (s) => s.replace(/\s*\((male|female)\)/gi, '').replace(/\s+v\. ?\d+$/i, '')
+  .replace(/\b\w/g, (c) => c.toUpperCase());
+const uid = () => 'd' + Math.random().toString(36).slice(2, 8);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function toast(msg, err = false) {
+  const t = $('toast'); t.textContent = msg; t.className = 'toast on' + (err ? ' err' : '');
+  clearTimeout(t._h); t._h = setTimeout(() => t.className = 'toast', err ? 6000 : 2200);
+}
+function setDirty(v = true) {
+  dirty = v;
+  const s = $('status');
+  s.textContent = v ? '● Unsaved changes' : (plan.updatedAt ? 'Saved ' + new Date(plan.updatedAt).toLocaleString() : 'Saved');
+  s.className = 'status' + (v ? ' dirty' : '');
+}
+
+// ---------- days ----------
+function renderDays() {
+  const box = $('dayList'); box.innerHTML = '';
+  plan.days.forEach((d, i) => {
+    const r = document.createElement('div');
+    r.className = 'dayrow' + (i === sel ? ' sel' : '');
+    r.draggable = true;
+    r.innerHTML = `<span class="num">${i + 1}</span><span class="nm">${esc(d.name || 'Untitled')}</span><span class="ct">${d.exercises.length}</span>`;
+    r.onclick = () => { sel = i; renderAll(); };
+    dnd(r, i, plan.days, (from, to) => { const cur = plan.days[sel]; move(plan.days, from, to); sel = plan.days.indexOf(cur); });
+    box.appendChild(r);
+  });
+  if (!plan.days.length) box.innerHTML = '<div class="empty">No days yet.<br>Click ＋ to add one.</div>';
+}
+
+// ---------- editor ----------
+function renderEditor() {
+  const d = plan.days[sel];
+  $('dayName').disabled = !d; $('delDay').disabled = !d;
+  $('dayName').value = d ? d.name : '';
+  $('daySub').textContent = d ? `Day ${sel + 1} · ${d.exercises.length} exercise${d.exercises.length === 1 ? '' : 's'} · drag to reorder · click a name to rename it for the watch` : '';
+  const box = $('exList'); box.innerHTML = '';
+  if (!d) return;
+  if (!d.exercises.length) { box.innerHTML = '<div class="empty">Empty day.<br>Pick exercises from the library →</div>'; return; }
+  d.exercises.forEach((x, i) => {
+    const e = BY_ID.get(x.id);
+    const r = document.createElement('div');
+    r.className = 'exrow'; r.draggable = true;
+    r.innerHTML = `
+      <span class="grip" title="Drag">⋮⋮</span>
+      <span class="ord">${i + 1}</span>
+      <img class="thumb" src="/dataset/${e ? e.gif : ''}" alt="" loading="lazy">
+      <div class="info">
+        <input class="label" value="${esc(x.label)}" placeholder="${esc(e ? pretty(e.name) : x.id)}">
+        <div class="orig">${esc(e ? `${e.name} · ${e.equipment} · ${e.target}` : 'Unknown id ' + x.id)}</div>
+      </div>
+      <button class="icon" data-a="up" title="Move up">↑</button>
+      <button class="icon" data-a="down" title="Move down">↓</button>
+      <button class="icon" data-a="rm" title="Remove">✕</button>`;
+    r.querySelector('.label').oninput = (ev) => { x.label = ev.target.value; setDirty(); };
+    r.querySelector('[data-a=up]').onclick = () => { if (i > 0) { move(d.exercises, i, i - 1); setDirty(); renderAll(); } };
+    r.querySelector('[data-a=down]').onclick = () => { if (i < d.exercises.length - 1) { move(d.exercises, i, i + 1); setDirty(); renderAll(); } };
+    r.querySelector('[data-a=rm]').onclick = () => { d.exercises.splice(i, 1); setDirty(); renderAll(); };
+    dnd(r, i, d.exercises);
+    box.appendChild(r);
+  });
+}
+
+// ---------- library ----------
+function filtered() {
+  const q = $('q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const eq = $('fEquip').value, tg = $('fTarget').value;
+  return LIB.filter((e) =>
+    (!eq || e.equipment === eq) && (!tg || e.target === tg) &&
+    q.every((w) => (e.name + ' ' + e.target + ' ' + e.equipment + ' ' + e.bodyPart).toLowerCase().includes(w)));
+}
+function renderLib() {
+  const list = filtered();
+  const inDay = new Set((plan.days[sel]?.exercises || []).map((x) => x.id));
+  $('libCount').textContent = `${list.length} result${list.length === 1 ? '' : 's'} · hover to animate · click to add`;
+  const g = $('grid'); g.innerHTML = '';
+  list.slice(0, shown).forEach((e) => {
+    const c = document.createElement('div');
+    c.className = 'card' + (inDay.has(e.id) ? ' in' : '');
+    c.innerHTML = `<img src="/dataset/${e.image}" alt="" loading="lazy"><div class="cn">${esc(e.name)}</div><div class="add">＋</div>`;
+    const img = c.querySelector('img');
+    c.onmouseenter = () => { img.src = '/dataset/' + e.gif; };
+    c.onmouseleave = () => { img.src = '/dataset/' + e.image; };
+    c.onclick = () => addEx(e);
+    c.title = `${e.name}\n${e.equipment} · ${e.target}`;
+    g.appendChild(c);
+  });
+  if (list.length > shown) {
+    const m = document.createElement('button'); m.className = 'btn more';
+    m.textContent = `Show more (${list.length - shown} left)`;
+    m.onclick = () => { shown += 120; renderLib(); };
+    g.appendChild(m);
+  }
+}
+function addEx(e) {
+  if (!plan.days.length) { plan.days.push({ id: uid(), name: 'Day 1', exercises: [] }); sel = 0; }
+  plan.days[sel].exercises.push({ id: e.id, label: pretty(e.name) });
+  setDirty(); renderAll();
+  toast(`Added “${pretty(e.name)}” to ${plan.days[sel].name}`);
+}
+
+// ---------- drag & drop ----------
+function move(arr, from, to) { const [x] = arr.splice(from, 1); arr.splice(to, 0, x); }
+let dragSrc = null;
+function dnd(el, i, arr, after) {
+  el.addEventListener('dragstart', (ev) => { dragSrc = { arr, i }; el.classList.add('dragging'); ev.dataTransfer.effectAllowed = 'move'; });
+  el.addEventListener('dragend', () => { el.classList.remove('dragging'); dragSrc = null; });
+  el.addEventListener('dragover', (ev) => { if (dragSrc && dragSrc.arr === arr) { ev.preventDefault(); el.classList.add('drag-over'); } });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+  el.addEventListener('drop', (ev) => {
+    ev.preventDefault(); el.classList.remove('drag-over');
+    if (!dragSrc || dragSrc.arr !== arr || dragSrc.i === i) return;
+    if (after) after(dragSrc.i, i); else move(arr, dragSrc.i, i);
+    setDirty(); renderAll();
+  });
+}
+
+function renderAll() { renderDays(); renderEditor(); renderLib(); }
+
+// ---------- actions ----------
+$('addDay').onclick = () => {
+  plan.days.push({ id: uid(), name: `Day ${plan.days.length + 1}`, exercises: [] });
+  sel = plan.days.length - 1; setDirty(); renderAll(); $('dayName').select();
+};
+$('delDay').onclick = () => {
+  const d = plan.days[sel]; if (!d) return;
+  if (!confirm(`Delete “${d.name}” and its ${d.exercises.length} exercises?`)) return;
+  plan.days.splice(sel, 1); sel = Math.max(0, sel - 1); setDirty(); renderAll();
+};
+$('dayName').oninput = (e) => { const d = plan.days[sel]; if (d) { d.name = e.target.value; setDirty(); renderDays(); } };
+['q', 'fEquip', 'fTarget'].forEach((id) => $(id).addEventListener('input', () => { shown = 120; renderLib(); }));
+
+async function save() {
+  const r = await fetch('/api/plan', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(plan) });
+  const j = await r.json();
+  if (!r.ok) { toast('Save failed: ' + j.error, true); return false; }
+  plan.updatedAt = j.updatedAt; setDirty(false);
+  $('preview').contentWindow.location.reload();
+  toast(`Saved · ${j.gifs.total} animations in site/gifs (+${j.gifs.added} / −${j.gifs.removed})`);
+  return true;
+}
+$('saveBtn').onclick = save;
+$('publishBtn').onclick = async () => {
+  const b = $('publishBtn'); b.disabled = true; b.textContent = 'Publishing…';
+  try {
+    if (!(await save())) return;
+    const j = await (await fetch('/api/publish', { method: 'POST' })).json();
+    if (j.ok) toast('Published ✓ — Vercel will update in ~30 s');
+    else { toast('Publish failed:\n' + j.out.slice(-400), true); console.log(j.out); }
+  } finally { b.disabled = false; b.textContent = 'Save & Publish'; }
+};
+document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); save(); } });
+window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+// ---------- boot ----------
+(async () => {
+  try {
+    const [lib, p] = await Promise.all([
+      fetch('/api/exercises').then((r) => r.ok ? r.json() : r.json().then((j) => Promise.reject(new Error(j.error)))),
+      fetch('/api/plan').then((r) => r.json()),
+    ]);
+    LIB = lib; BY_ID = new Map(lib.map((e) => [e.id, e]));
+    plan = p; plan.days = plan.days || [];
+    const opts = (key) => [...new Set(LIB.map((e) => e[key]).filter(Boolean))].sort();
+    opts('equipment').forEach((v) => $('fEquip').add(new Option(v, v)));
+    opts('target').forEach((v) => $('fTarget').add(new Option(v, v)));
+    setDirty(false); renderAll();
+  } catch (err) {
+    $('status').textContent = 'Error: ' + err.message; toast(err.message, true);
+  }
+})();
+</script>
+</body>
+</html>
