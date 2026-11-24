@@ -18,7 +18,7 @@ import os from 'node:os';
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 export const MODEL = path.join(DIR, 'man.glb');
 // bump when render.html changes in a way that should re-render every animation
-export const RENDER_STYLE = 'r3d-v2';
+export const RENDER_STYLE = 'r3d-v3';
 
 const BROWSERS = [
   process.env.BROWSER,
@@ -76,6 +76,20 @@ function run(query, outDir, jobs, { onLog = () => {}, timeoutMs = 30 * 60 * 1000
       browser.on('exit', () => setTimeout(() => { if (!finished) finish(new Error('browser exited before finishing')); rm(profile, { recursive: true, force: true }).catch(() => {}); }, 300));
       timer = setTimeout(() => finish(new Error('3D render timed out')), timeoutMs);
     });
+  });
+}
+
+// Encode an exercise's frames (<dir>/0.jpg …) into a small looping MP4 (H.264 baseline, muted).
+// Watch browsers that play inline video use it (hardware-decoded, smooth); others fall back to the frames.
+// Resolves false when ffmpeg isn't installed.
+export function encodeLoop(dir, fps) {
+  const ffmpeg = ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'].find((f) => existsSync(f)) || 'ffmpeg';
+  return new Promise((resolve) => {
+    const p = spawn(ffmpeg, ['-y', '-loglevel', 'error', '-framerate', String(fps), '-i', path.join(dir, '%d.jpg'),
+      '-c:v', 'libx264', '-profile:v', 'baseline', '-level', '3.0', '-pix_fmt', 'yuv420p', '-crf', '24', '-g', String(fps * 2),
+      '-movflags', '+faststart', '-an', path.join(dir, 'loop.mp4')], { stdio: 'ignore' });
+    p.on('error', () => resolve(false));
+    p.on('exit', (code) => resolve(code === 0));
   });
 }
 

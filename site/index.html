@@ -110,6 +110,7 @@
   /* one stacked 180x180 img per animation frame; JS shows one at a time (.on) */
   .tile img { position: absolute; left: 0; top: 0; display: block; width: 100%; height: 100%; visibility: hidden; }
   .tile img.on { visibility: visible; }
+  .tile video { position: absolute; left: 0; top: 0; display: block; width: 100%; height: 100%; background: #000; }
   .tile.loading img { visibility: hidden; }
   .tile.missing { background: var(--card); }
   .tile.missing img { visibility: hidden; }
@@ -213,7 +214,7 @@
 
   var plan = null, planText = null, offline = false;
   var viewWk = -1; // week shown on home; -1 = follow the calendar
-  var day = null, dayIdx = -1, idx = 0, lockUntil = 0, keep = [];
+  var day = null, dayIdx = -1, idx = 0, lockUntil = 0;
 
   function current() {
     var ids = ['home', 'ex', 'done'];
@@ -305,12 +306,54 @@
   }
   function delaysOf(id) { return (plan.anim && plan.anim[id]) || [1000]; }
 
-  // Frame player. Watch browsers may not animate GIFs, and watchOS downsamples large images, so each
-  // frame is its own small image; all of them sit stacked in the tile and setTimeout flips which is visible.
-  var player = { timer: null, frame: 0, delays: [], imgs: [], id: null };
+  function videoSrc(id) {
+    var v = (plan.animVer && plan.animVer[id]) || plan.animV;
+    return 'anim/' + id + '/loop.mp4' + (v ? '?v=' + encodeURIComponent(v) : '');
+  }
+  function hasVideo(id) { return !!(plan.animVideo && plan.animVideo[id]); }
+
+  // ---- background prefetch: one exercise at a time, 2 requests in flight, nothing kept in memory ----
+  // (the browser's HTTP cache keeps the files, so the day still works if the connection drops)
+  var pre = { list: [], busy: 0, paused: true };
+  function prefetchDay(ids) {
+    pre.list = [];
+    for (var k = 0; k < ids.length; k++) {
+      var id = ids[k];
+      if (useVideo(id)) { pre.list.push(videoSrc(id)); continue; }
+      var nf = delaysOf(id).length;
+      for (var f = 0; f < nf; f++) pre.list.push(frameSrc(id, f));
+    }
+  }
+  function pumpPrefetch() {
+    while (!pre.paused && pre.busy < 2 && pre.list.length) {
+      var src = pre.list.shift();
+      pre.busy++;
+      if (/\.mp4/.test(src)) {
+        var x = new XMLHttpRequest(); x.open('GET', src, true);
+        x.onloadend = function () { pre.busy--; pumpPrefetch(); };
+        x.send();
+      } else {
+        var im = new Image();
+        im.onload = im.onerror = function () { this.onload = this.onerror = null; pre.busy--; pumpPrefetch(); };
+        im.src = src;
+      }
+    }
+  }
+  function pausePrefetch() { pre.paused = true; }
+  function resumePrefetch() { pre.paused = false; pumpPrefetch(); }
+
+  // ---- video support: tested once on this watch browser, then remembered ----
+  // '1' = inline muted video plays, '0' = it doesn't (use frames), null = not known yet
+  var KEY_VIDEO = 'wp.video', VIDEO_OK = store.get(KEY_VIDEO);
+  function useVideo(id) { return VIDEO_OK !== '0' && hasVideo(id); }
+
+  // Player. Watch browsers may not animate GIFs and watchOS blurs big images, so an exercise is either
+  // a small looping MP4 (smooth, hardware-decoded) or a run of small frames flipped with setTimeout.
+  var player = { timer: null, frame: 0, delays: [], imgs: [], id: null, video: null, check: null };
   function stopAnim() {
     if (player.timer) clearTimeout(player.timer);
     player.timer = null;
+    if (player.video) { try { player.video.pause(); } catch (e) {} }
   }
   function showFrame(n) {
     player.imgs[player.frame].className = '';
@@ -319,34 +362,106 @@
   }
   function stepAnim() {
     var n = (player.frame + 1) % player.imgs.length, im = player.imgs[n];
-    if (!im.complete || !im.naturalWidth) { player.timer = setTimeout(stepAnim, 120); return; } // still loading
+    if (!im.complete || !im.naturalWidth) { player.timer = setTimeout(stepAnim, 60); return; } // still loading
     showFrame(n);
     player.timer = setTimeout(stepAnim, player.delays[n]);
   }
   function playAnim() {
     stopAnim();
+    if (player.video) { var pr = player.video.play(); if (pr && pr.catch) pr.catch(function () {}); }
     if (!player.imgs.length) return;
     showFrame(0);
     if (player.imgs.length > 1) player.timer = setTimeout(stepAnim, player.delays[0]);
   }
-  function loadAnim(id) {
+  function resetTile(id) {
     stopAnim();
-    var tile = $('tile'), delays = delaysOf(id);
-    tile.innerHTML = ''; tile.classList.add('loading'); tile.classList.remove('missing');
-    player.id = id; player.delays = delays; player.imgs = []; player.frame = 0;
+    if (player.check) clearTimeout(player.check);
+    var tile = $('tile');
+    tile.innerHTML = ''; tile.classList.remove('missing');
+    player.id = id; player.imgs = []; player.frame = 0; player.video = null;
+    pausePrefetch();                       // the exercise on screen gets the connection first
+    return tile;
+  }
+
+  // Video, if this browser plays it. While support is still unknown, the frames play underneath so the
+  // tile is never stuck: the first of the two to actually move wins, and the result is remembered.
+  function loadVideo(id) {
+    var testing = VIDEO_OK !== '1';
+    if (testing) loadFrames(id); else resetTile(id);
+    var tile = $('tile'), v = document.createElement('video');
+    v.muted = true; v.loop = true; v.autoplay = true; v.preload = 'auto';
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', '');
+    if (testing) v.style.visibility = 'hidden'; else v.poster = frameSrc(id, 0);
+    v.src = videoSrc(id);
+    tile.appendChild(v); player.video = v;
+    var started = Date.now(), done = false;
+    function ok() {
+      if (done || player.video !== v) return;
+      done = true;
+      if (VIDEO_OK !== '1') { VIDEO_OK = '1'; store.set(KEY_VIDEO, '1'); }
+      if (player.timer) clearTimeout(player.timer);         // hand over from the frames
+      player.timer = null;
+      for (var i = 0; i < player.imgs.length; i++) tile.removeChild(player.imgs[i]);
+      player.imgs = []; tile.classList.remove('loading');
+      v.style.visibility = '';
+      resumePrefetch();
+    }
+    function fail() {
+      if (done || player.video !== v) return;
+      done = true;
+      if (testing) { VIDEO_OK = '0'; store.set(KEY_VIDEO, '0'); prefetchDay(dayIds(idx + 1)); }
+      try { v.pause(); } catch (e) {}
+      if (v.parentNode) v.parentNode.removeChild(v);
+      player.video = null;
+      if (testing) playAnim(); else loadFrames(id);          // frames are already there when testing
+    }
+    v.addEventListener('timeupdate', function () { if (v.currentTime > 0.05) ok(); }, false);
+    v.addEventListener('error', fail, false);
+    (function watch() {
+      player.check = setTimeout(function () {
+        if (done || player.video !== v) return;
+        if (v.currentTime > 0.05) return ok();
+        var waited = Date.now() - started;
+        if ((v.readyState >= 2 && waited > 3000) || waited > 12000) return fail();
+        watch();
+      }, 1000);
+    })();
+    var pr = v.play(); if (pr && pr.catch) pr.catch(function () {});
+  }
+
+  function loadFrames(id) {
+    var tile = resetTile(id), delays = delaysOf(id);
+    tile.classList.add('loading');
+    player.delays = delays;
     for (var n = 0; n < delays.length; n++) {
       var im = document.createElement('img');
       im.alt = '';
       im.src = frameSrc(id, n);
       tile.appendChild(im); player.imgs.push(im);
     }
-    var first = player.imgs[0];
+    var first = player.imgs[0], last = player.imgs[player.imgs.length - 1];
     function ready() { if (player.id === id) { tile.classList.remove('loading'); playAnim(); } }
     if (first.complete && first.naturalWidth) ready();
     else {
       first.onload = ready;
       first.onerror = function () { if (player.id === id) { tile.classList.remove('loading'); tile.classList.add('missing'); } };
     }
+    // once this exercise is fully loaded, let the rest of the day prefetch
+    (function waitAll() {
+      if (player.id !== id) return;
+      for (var i = 0; i < player.imgs.length; i++) if (!player.imgs[i].complete) { setTimeout(waitAll, 300); return; }
+      resumePrefetch();
+    })();
+  }
+  function loadAnim(id) { if (useVideo(id)) loadVideo(id); else loadFrames(id); }
+  // ids of the day's exercises from position `from`, wrapping, without repeats
+  function dayIds(from) {
+    var out = [], seen = {};
+    for (var k = 0; k < day.exercises.length; k++) {
+      var id = day.exercises[(from + k) % day.exercises.length].id;
+      if (!seen[id]) { seen[id] = 1; out.push(id); }
+    }
+    return out;
   }
 
   function openDay(i) {
@@ -357,14 +472,9 @@
     var segs = '';
     for (var j = 0; j < d.exercises.length; j++) segs += '<i></i>';
     $('segs').innerHTML = segs;
+    prefetchDay(dayIds(1));                  // the rest of the day, next exercise first
     renderEx(0);
     show('ex');
-    // preload the whole day so it keeps working if the connection drops mid-workout
-    keep = [];
-    for (var k = 1; k < d.exercises.length; k++) {
-      var id = d.exercises[k].id, nf = delaysOf(id).length;
-      for (var f = 0; f < nf; f++) { var im = new Image(); im.src = frameSrc(id, f); keep.push(im); }
-    }
   }
 
   function renderEx(dir) {

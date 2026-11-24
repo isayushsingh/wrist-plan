@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { decode, darkBackground, frameImages } from './gif.mjs';
 import { MOTIONS, RENDERED, motionInfo } from './motion-map.mjs';
-import { renderJobs, RENDER_STYLE } from '../tools/render3d/render.mjs';
+import { renderJobs, encodeLoop, RENDER_STYLE } from '../tools/render3d/render.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATASET = process.env.DATASET || path.join(ROOT, 'dataset');
@@ -21,7 +21,7 @@ const ATTRIBUTION = '© Gym visual — https://gymvisual.com/';
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
   '.json': 'application/json', '.gif': 'image/gif', '.jpg': 'image/jpeg',
-  '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+  '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.mp4': 'video/mp4',
 };
 
 // ---------- dataset ----------
@@ -173,7 +173,8 @@ async function syncAnims(plan, onProgress = () => {}) {
     for (const j of jobs) {
       const r = res[j.id];
       if (!r) throw new Error(`3D render produced nothing for ${j.id} (${j.key})`);
-      items[j.id] = { kind: '3d', sig: j.sig, n: r.frames, ms: Math.round(1000 / r.fps), ext: 'jpg', v: Date.now().toString(36) };
+      const video = await encodeLoop(path.join(ANIM, j.id), r.fps);
+      items[j.id] = { kind: '3d', sig: j.sig, n: r.frames, ms: Math.round(1000 / r.fps), ext: 'jpg', video, v: Date.now().toString(36) };
       if (!existing.has(j.id)) added++;
       rendered++;
     }
@@ -198,12 +199,13 @@ async function syncAnims(plan, onProgress = () => {}) {
   await writeFile(META, JSON.stringify({ items }) + '\n');
 
   // what the watch needs: per-id frame delays, file extension and cache tag
-  const anim = {}, animExt = {}, animVer = {};
+  const anim = {}, animExt = {}, animVer = {}, animVideo = {};
   for (const [id, it] of Object.entries(items)) {
     anim[id] = it.kind === '3d' ? Array(it.n).fill(it.ms) : it.delays;
     animExt[id] = it.ext; animVer[id] = it.v;
+    if (it.video) animVideo[id] = 1;
   }
-  return { added, removed, rendered, total: Object.keys(want).length, anim, animExt, animVer };
+  return { added, removed, rendered, total: Object.keys(want).length, anim, animExt, animVer, animVideo };
 }
 
 const git = (args) => new Promise((resolve) => {
@@ -235,10 +237,11 @@ const server = http.createServer(async (req, res) => {
       await loadLibrary();
       const plan = validatePlan(JSON.parse(await readBody(req)));
       const t0 = Date.now();
-      const { anim, animExt, animVer, ...gifs } = await syncAnims(plan, (m) => console.log('  ' + m));
+      const { anim, animExt, animVer, animVideo, ...gifs } = await syncAnims(plan, (m) => console.log('  ' + m));
       plan.anim = anim;         // { id: [ms per frame] }
       plan.animExt = animExt;   // { id: 'jpg' (3D) | 'png' (raster) }
       plan.animVer = animVer;   // { id: cache tag } — frames are served with a 1-week max-age
+      plan.animVideo = animVideo; // { id: 1 } when anim/<id>/loop.mp4 exists (3D only)
       await writeFile(PLAN, JSON.stringify(plan, null, 2) + '\n');
       return send(res, 200, { ok: true, updatedAt: plan.updatedAt, gifs, seconds: Math.round((Date.now() - t0) / 1000) });
     }

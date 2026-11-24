@@ -1,119 +1,188 @@
 # WristPlan
 
-**My trainer's workout plan on my Apple Watch: just the exercise name and a realistic 3D animation of the movement, with the target muscles lit up.**
-It's free, has no app to install, and does no tracking.
+A minimal workout viewer for Apple Watch. It shows one thing per screen: the name of the next exercise and a realistic 3D animation of how to perform it, with the target muscles highlighted.
 
-![WristPlan on Apple Watch: day list, exercise screens and the done screen](docs/watch.png)
+WristPlan runs as a static web page opened in a watch browser, so it needs no App Store listing and no paid Apple Developer account. Plans are built on a laptop in a local admin portal and published with one click.
 
----
+![WristPlan on Apple Watch: the day list, two exercise screens and the next-exercise view](docs/watch.png)
 
-## The problem
+## Contents
 
-My trainer gives me a plan: a few days a week, five or six exercises each, and two different weeks that alternate. At the gym, all I need at any moment is the answer to *"what's next, and how does it go?"*
+- [Features](#features)
+- [Why a web page](#why-a-web-page)
+- [How it works](#how-it-works)
+- [Getting started](#getting-started)
+- [Using the admin portal](#using-the-admin-portal)
+- [Animation pipeline](#animation-pipeline)
+- [Project structure](#project-structure)
+- [Development](#development)
+- [Limitations](#limitations)
+- [Credits and licensing](#credits-and-licensing)
 
-What I tried before didn't fit:
+## Features
 
-- **Fitness apps** are built around tracking: sets, reps, timers, rest, streaks, logins. I don't want to log anything; I want to glance at my wrist and see the next movement.
-- **My phone** works, but it means unlocking and scrolling between sets, then getting distracted.
-- **A native watchOS app** needs the paid Apple Developer Program ($99/year) to stay installed. With a free Apple ID, a sideloaded app expires every 7 days.
-- **Expo / React Native** can't build watch UI, and EAS iOS device builds need the paid account too.
+**On the watch**
 
-So I needed something that:
+- **Realistic 3D animations.** A lifelike character performs each exercise with real equipment: barbells, dumbbells, benches, cable stations and machines. The movement follows a realistic rep tempo, and the target muscles glow red as they contract.
+- **Built for a glance.** Each screen shows only the exercise name, the animation and the position in the session (for example, *Push · 2 of 5*).
+- **Alternating weeks.** Plans can hold two weeks (A and B) that alternate every Monday. The watch opens the current week and highlights the next day to train.
+- **Simple controls.** Tap the right side of the screen for the next exercise or the left side for the previous one, or swipe.
+- **Works offline.** The last plan is cached, and the rest of the day's animations download in the background, so a weak gym signal doesn't interrupt a session.
+- **No tracking.** There are no sets, reps, timers, accounts or logs.
 
-1. runs on the watch, **for free, permanently**;
-2. shows **only** the exercise name and a demonstration;
-3. is **easy to update** when the trainer changes the plan;
-4. still works if the gym's signal is bad.
+**On the laptop**
 
-## My solution
+- **Exercise library.** Search 1,324 exercises and filter them by equipment and muscle.
+- **Plan builder.** Build days for each week, rename exercises to match the trainer's wording, and reorder them by dragging.
+- **Live watch preview.** See the result at 41, 45 or 49 mm sizes before publishing.
+- **One-click publish.** *Save & Publish* renders any new animations, commits the site and pushes it, and Vercel redeploys automatically.
 
-A **static web page** built for a watch-sized screen, hosted free on **Vercel** and opened in a free watch browser, plus a **local admin portal** on my laptop for building the plan.
+![The admin portal: weeks and days on the left, the selected day's exercises in the middle, the exercise library on the right](docs/admin.png)
 
-```
- laptop                                   GitHub → Vercel                 Apple Watch
-┌──────────────────────────┐   Publish   ┌──────────────────┐   HTTPS   ┌──────────────────────┐
-│ Admin portal (Node, 0 dep)│ ──git push─▶│ site/  (static)  │ ────────▶ │ watch browser         │
-│ search 1,324 exercises    │             │  index.html      │           │ (Ant / Fern / …),     │
-│ build Week A / Week B     │             │  plan.json       │           │ bookmarked            │
-│ render 3D animations      │             │  anim/<id>/*.jpg │           │ cached for offline    │
-└──────────────────────────┘             └──────────────────┘           └──────────────────────┘
-```
+## Why a web page
 
-- **No App Store, no developer account, no expiry.** It's just a bookmarked web page.
-- **One-tap updates.** I edit the plan in the admin and click *Save & Publish*. That commits and pushes `site/`, and Vercel redeploys in about 30 seconds.
-- **Alternating weeks.** Week A and Week B rotate every Monday. The watch works out which week it is, and I can still peek at the other one.
-- **Works offline.** The watch keeps the last plan it loaded and preloads the day's animations when I open it.
+A native watchOS app needs the paid Apple Developer Program (US$99 a year) to stay installed. Apps sideloaded with a free Apple ID expire every seven days. Cross-platform tools such as Expo and React Native cannot build watch interfaces, and EAS device builds also require the paid account.
 
-## Preview
-
-### On the watch
-
-| | |
-|---|---|
-| **Home** | Week A / Week B tabs, with a dot for the current week. The day after the one I did last is highlighted as **Up next**. |
-| **Exercise** | A realistic 3D man doing the movement with real equipment, the target muscles glowing as they contract, plus the name and *Day · n of N*. A progress bar sits at the top. |
-| **Controls** | Tap the right ⅔ of the screen for next, the left ⅓ for previous, or swipe. The ‹ button goes back to the days. |
-| **Done** | A check animation, then what's next: the next day, or the first day of next week. |
-
-### Admin portal (laptop)
-
-![Admin portal: weeks and days on the left, the selected day's exercises in the middle, the exercise library on the right](docs/admin.png)
-
-- **Left:** Week A / B tabs (double-click to rename; *Make this week* resets the rotation), the days (drag to reorder), and a **live watch preview** at 41, 45 or 49 mm.
-- **Middle:** the selected day's exercises. Rename each one to whatever my trainer calls it, pick its **animation** (auto-matched movement, a different one, or the original), drag or ↑↓ to reorder, ✕ to remove.
-- **Right:** a searchable library of 1,324 exercises with equipment and muscle filters. Hover to animate, click to add. Press `/` to jump to search.
-
-## Getting started
-
-Needs **Node 18+**, **git**, and **Brave or Google Chrome** (used headless to render the 3D animations; rendering also loads three.js from a CDN, so it needs internet).
-
-### 1. Run the admin
-
-```bash
-npm run setup     # one-time: downloads the exercise library (~300 MB) and the 3D character (~11 MB); neither is deployed
-npm run admin     # → http://localhost:4321
-```
-
-When the trainer sends a plan, search each exercise, click the right animation, and rename it to match their wording. Press **Save** (⌘S) to write `site/plan.json` and generate the animations.
-
-### 2. Deploy (one-time)
-
-Push the repo to GitHub, then on vercel.com use **Add New → Project** and import it. `vercel.json` already sets everything up, so there's no build step.
-
-From then on, **Save & Publish** in the admin runs `git add site && git commit && git push`, and Vercel redeploys.
-
-### 3. Put it on the watch
-
-1. On the iPhone, open the Watch app → App Store and install a free watch browser (e.g. **Ant Browser**, **Fern Browser** or **Searchino**).
-2. Open the Vercel URL in it and bookmark it. Alternatively, iMessage the link to yourself and tap it on the watch.
+A static page served from Vercel and bookmarked in a free watch browser avoids all of these costs, and it never expires.
 
 ## How it works
 
-| Decision | Why |
-|---|---|
-| **A web page, not a watch app** | It's the only way to stay free and permanently installed. |
-| **Zero dependencies, no build step** | Both pages are single HTML files and the admin server is plain Node, so there's nothing to update or break. |
-| **Old-WebKit-safe watch page** | Watch browsers run limited WebKit, so the page uses ES5, XHR instead of `fetch`, no flex `gap` and no `aspect-ratio`. Sizes are in `vw` for 176–205 px screens. |
-| **Rendered 3D animations** | The dataset's animations are 180 px rasters, so they always looked blurry on the watch. Instead, Save renders each exercise on the laptop: a realistic CC0 3D character, posed by an inverse-kinematics rig, lifts real 3D equipment (barbells, dumbbells, benches, cable stations, machines) with lifting tempo (slow lowering, a pause, a faster press), and the dataset's target and secondary muscles glow red as they contract. It's three.js running in headless Brave or Chrome, writing 360 px JPEG frames at 12 fps (twice the watch tile, so they're always sharp), about 370 KB per exercise. Renders are cached; only new or changed exercises are rendered on Save (~7 s each). 31 movements cover every exercise in my plan. |
-| **Raster fallback** | Anything without a 3D movement (mostly stretches and cardio), or set to "Original animation" in the admin, shows the original animation. Save decodes it into 180×180 PNG frames with the white backdrop turned black, and JS flips between them, because some watch browsers won't play GIFs. |
-| **Alternating weeks** | `plan.json` stores the weeks plus `weekAnchor`, the Monday Week A starts. Current week = weeks since the anchor, mod 2, so it never resets at month boundaries. |
-
 ```
-admin/server.mjs   local server: library API, plan validation, animation build, git publish
-admin/index.html   admin UI
-admin/motion-map.mjs  matches exercises to 3D movements, muscles and equipment
-tools/render3d/    the 3D renderer: render.html (three.js scene, rig, equipment, 31 movements) + render.mjs (headless-browser driver)
-admin/gif.mjs      zero-dep GIF decoder, backdrop darkening, per-frame PNG writer
-site/index.html    the watch page (what Vercel serves)
-site/plan.json     the plan, written only by the admin
-site/anim/<id>/    each exercise's frames: 3D renders (.jpg) or the original animation (.png), generated on Save
-scripts/setup.mjs  downloads the exercise dataset into ./dataset (gitignored)
+ Laptop                                     GitHub → Vercel                Apple Watch
+┌───────────────────────────┐   Publish   ┌───────────────────┐   HTTPS   ┌───────────────────────┐
+│ Admin portal (Node)        │ ─git push──▶│ site/ (static)    │ ────────▶ │ Watch browser         │
+│ • exercise library         │             │ • index.html      │           │ (Ant, Fern, Searchino) │
+│ • plan builder             │             │ • plan.json       │           │ • bookmarked page     │
+│ • 3D renderer              │             │ • anim/<id>/*.jpg │           │ • cached for offline  │
+└───────────────────────────┘             └───────────────────┘           └───────────────────────┘
 ```
 
-## Credits and licence
+1. The **admin portal** runs locally. It edits the plan and, on Save, writes `site/plan.json` and renders the animation frames for each exercise into `site/anim/`.
+2. **Publishing** commits and pushes the `site/` folder. Vercel serves it as-is, with no build step.
+3. The **watch page** loads `plan.json` and plays each exercise's frames with a lightweight JavaScript player.
 
-- Exercise animations © **[Gym visual](https://gymvisual.com/)**, from the [exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) by hasaneyldrm.
-- They're redistributed with permission at their original 180×180 size, with attribution required. The watch page keeps the credit line.
-- 3D character: "Man Base Mesh" from [Grab3D](https://grab3d.com/models/characters/man-base-character/), CC0 (public domain). The 3D movements, equipment and renders are original to WristPlan.
-- Where the original animations are still used, WristPlan only recolours the white backdrop for the dark UI.
-- This deployment is for **personal use**. Check Gym visual's terms before making anything like it public or commercial.
+## Getting started
+
+### Requirements
+
+- **Node.js 18 or later**
+- **git**
+- **Brave or Google Chrome**, used headless to render the 3D animations
+- An internet connection while rendering (the renderer loads three.js from a CDN)
+
+### Installation
+
+```bash
+git clone <your-fork-url> wristplan
+cd wristplan
+npm run setup     # one-time: downloads the exercise library (~300 MB) and the 3D character (~11 MB)
+npm run admin     # starts the admin portal at http://localhost:4321
+```
+
+Neither download is committed to the repository or deployed.
+
+### Deploying
+
+1. Push the repository to GitHub.
+2. In Vercel, choose **Add New → Project** and import the repository. `vercel.json` already configures the output folder and caching, so no build settings are needed.
+3. From then on, **Save & Publish** in the admin portal deploys every change.
+
+### Setting up the watch
+
+1. On the iPhone, open the **Watch** app, go to the App Store, and install a free watch browser such as **Ant Browser**, **Fern Browser** or **Searchino**.
+2. Open the Vercel URL in that browser and bookmark it. Alternatively, send the link to yourself in Messages and tap it on the watch.
+
+## Using the admin portal
+
+1. **Choose a week.** Use the Week A / Week B tabs at the top left. Double-click a tab to rename it. *Make this week* sets which week the watch treats as current.
+2. **Add days.** Click **+ Add day**, then name the day (for example, *Push*).
+3. **Add exercises.** Search the library on the right and click an exercise to add it to the selected day. Hover over a card to preview its original animation.
+4. **Adjust the list.** Rename an exercise to match the trainer's wording, reorder by dragging or with the arrows, and remove with ✕.
+5. **Choose the animation (optional).** Each exercise is matched to a 3D movement automatically. Use the **Animation** menu to pick a different movement, or *Original animation* to use the dataset's version.
+6. **Save** (⌘S) to write the plan and render new animations, or **Save & Publish** to deploy as well.
+
+Rendering takes about 7 seconds per new exercise. Previously rendered exercises are reused, so later saves are usually instant.
+
+## Animation pipeline
+
+### 3D renders
+
+The renderer in `tools/render3d/` is a three.js scene that runs in a headless browser.
+
+- **Character:** a rigged, public-domain (CC0) human model.
+- **Posing:** an inverse-kinematics rig that keeps hands on the equipment and feet planted. The fingers are curled procedurally into a grip, because the model has no finger bones.
+- **Equipment:** built procedurally in 3D, including benches, barbells, dumbbells, cable stations with moving cables, and machines.
+- **Motion:** each movement is a rep timeline with minimum-jerk easing and realistic tempo (a controlled lowering, a short pause, a faster lift), plus small secondary motion.
+- **Muscle highlights:** painted onto the mesh from the dataset's primary and secondary muscles. Their intensity follows the contraction.
+- **Output:** 288 × 288 JPEG frames at 12 fps (about 200 KB per exercise) plus a muted MP4 loop of the same animation (about 30 KB, made with ffmpeg if it is installed). The frames are twice the size of the watch tile, so they are always downscaled and stay sharp.
+
+Renders are cached by movement, muscles and renderer version, and only new or changed exercises are rendered. There are 31 movements, covering presses, raises, curls, extensions, rows, pulldowns, squats, lunges, hinges, leg machines and core work.
+
+### Original animations (fallback)
+
+Exercises without a 3D movement, mostly stretches and cardio, use the dataset's original animation. It is decoded into individual frames, and its white background is changed to black to match the watch interface.
+
+### Playback on the watch
+
+The watch page plays the MP4 when the browser supports inline video, because it is small and hardware-decoded. The first time, it tests this while the frame animation plays underneath, so the screen never stalls, and then it remembers the result. Otherwise it plays the individual frames with a JavaScript timer. Some watch browsers show only the first frame of an animated GIF, and watchOS downsamples large images such as sprite sheets, so small separate frames are the reliable fallback.
+
+The exercise on screen always loads first. The rest of the day is then downloaded quietly in the background, so a session keeps working if the connection drops.
+
+If playback is slow on a particular watch browser, open `/check.html` on the deployed site. It reports whether the browser plays inline video, how fast its timers run, and how long one exercise's frames take to download.
+
+## Project structure
+
+```
+admin/
+  server.mjs         Local server: library API, plan validation, animation sync, git publish
+  index.html         Admin portal (single file)
+  motion-map.mjs     Matches library exercises to 3D movements, muscles and equipment
+  gif.mjs            GIF decoder and frame writer for the fallback animations
+tools/render3d/
+  render.html        three.js scene: character, rig, equipment, movements, muscle shader
+  render.mjs         Headless-browser driver used by the admin server
+site/                Deployed as-is by Vercel
+  index.html         Watch page (single file, compatible with older WebKit)
+  plan.json          The workout plan, written by the admin portal
+  anim/<id>/         Animation frames for each exercise in the plan
+scripts/setup.mjs    Downloads the exercise dataset and the 3D model
+docs/                Screenshots used in this README
+```
+
+The project has no runtime dependencies and no build step. Both pages are single HTML files, and the server uses only Node's standard library.
+
+## Development
+
+| Task | Command |
+| --- | --- |
+| Start the admin portal | `npm run admin` (set `PORT` to change from 4321) |
+| Preview a movement as six stills | `npm run strip -- <movement> [outDir]` |
+| Check a watch browser's capabilities | open `/check.html` on the deployed site |
+
+### Adding a movement
+
+1. Define it in `EX` inside `tools/render3d/render.html`: the equipment setup, camera direction, rep timeline and pose function.
+2. Review it with `npm run strip -- <movement>`.
+3. Register the key, label and a name-matching rule in `admin/motion-map.mjs`.
+4. Save the plan in the admin portal to render it.
+
+To force every exercise to re-render after a renderer change, increase `RENDER_STYLE` in `tools/render3d/render.mjs`.
+
+### Watch page compatibility
+
+Watch browsers run limited versions of WebKit, so `site/index.html` avoids modern-only features. It uses ES5 syntax and `XMLHttpRequest` instead of `fetch`, and avoids flexbox `gap` and `aspect-ratio`. Sizes use viewport units so that layouts fit screens about 176 to 205 px wide.
+
+## Limitations
+
+- The movements are hand-choreographed with realistic timing; they are not motion capture.
+- Hands form a closed grip, so the thumbs do not wrap around bars, and push-ups are shown on the knuckles.
+- Exercises outside the 31 movements fall back to the dataset's lower-resolution original animation.
+- Rendering requires Brave or Chrome and an internet connection on the laptop. MP4 loops also need ffmpeg; without it, the watch uses the frames.
+
+## Credits and licensing
+
+- **3D character:** "Man Base Mesh" by [Grab3D](https://grab3d.com/models/characters/man-base-character/), released under CC0 1.0 (public domain). The 3D movements, equipment and renders are original to this project.
+- **Exercise data and original animations:** © [Gym visual](https://gymvisual.com/), via the [exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) by hasaneyldrm. These are redistributed with permission at their original 180 × 180 size, with attribution required; the watch page displays the credit. WristPlan changes only their background colour.
+- **three.js:** MIT licence, loaded from a CDN at render time.
+
+This deployment is intended for personal use. Review Gym visual's terms before using the original animations in a public or commercial product. The repository itself does not currently include an open-source licence.

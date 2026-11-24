@@ -20,7 +20,9 @@ admin/gif.mjs      zero-dep GIF decoder + darkBackground() (white backdrop → #
 site/              deployed as-is (vercel.json → outputDirectory: "site", no build)
   index.html       watch UI (vanilla JS, single file, ES5-ish for old WebKit)
   plan.json        source of truth, written only by admin Save
-  anim/<id>/<n>.jpg  3D-rendered frames (360×360, 12 fps), for plan exercises whose movement is in RENDERED
+  anim/<id>/<n>.jpg  3D-rendered frames (288×288, 12 fps, ~200 KB per exercise), for plan exercises whose movement is in RENDERED
+  anim/<id>/loop.mp4 the same 3D loop as a muted H.264 video (~30 KB), made by ffmpeg on Save when available
+  check.html       diagnostic page for the watch browser: inline-video support, timer speed, frame download time
   anim/<id>/<n>.png  raster fallback frames (180×180), for exercises with no 3D movement or overridden to 'gif'
   anim/meta.json   per-id cache: 3D {sig: key|muscles|RENDER_STYLE, n, ms} or raster {style: ANIM_STYLE, delays}; changed entries are regenerated on Save
 scripts/setup.mjs  shallow-clones the dataset into ./dataset (gitignored, ~300 MB)
@@ -43,7 +45,7 @@ plan.json:
 - Day ids must be unique across all weeks, because `wp.lastDay` stores one. The server de-dupes them.
 - v1 plans (a top-level `days` array) are still accepted everywhere. The admin migrates one on load into Week A plus a copy as Week B; the watch treats it as a single week.
 - `id` is the 4-digit dataset id. `label` is the display name shown on the watch. `mo` (optional) overrides the animation: a movement key, or `"gif"` for the original raster animation.
-- Written by Save: `anim` (id → frame delays in ms), `animExt` (id → 'jpg' 3D | 'png' raster), `animVer` (id → cache tag; frames are served with a 1-week max-age). Older plans may still carry `motion`/`animV`; they're ignored.
+- Written by Save: `anim` (id → frame delays in ms), `animExt` (id → 'jpg' 3D | 'png' raster), `animVer` (id → cache tag; frames are served with a 1-week max-age), `animVideo` (id → 1 when loop.mp4 exists). Older plans may still carry `motion`/`animV`; they're ignored.
 - Dataset `data/exercises.json` is an array of objects with `id, name, target, body_part, equipment, image (180px jpg), gif_url (180px gif)`. Some names contain the mojibake `в°`, which `cleanName()` turns into `°`.
 
 ## Admin server API
@@ -57,7 +59,11 @@ plan.json:
 ## Watch UI behaviour
 - Home: Week A / Week B tabs (a lime dot marks the calendar's current week; tapping the other only changes the view and resets when the page returns to the foreground), then that week's days. In the current week, the day after the last-opened day gets an accent outline and "Up next". The last-opened day is stored in localStorage (`wp.lastDay`); every storage call is wrapped in try/catch.
 - Exercise screen:
-  - **3D animations (default).** The dataset's raster animations are only 180px, so they always looked blurry on the watch (GIF, sprite sheet and per-frame PNGs were all tried). Each exercise is instead rendered on the laptop by tools/render3d into 360×360 JPEG frames (2× the tile) and played by the same frame player.
+  - **3D animations (default).** The dataset's raster animations are only 180px, so they always looked blurry on the watch (GIF, sprite sheet and per-frame PNGs were all tried). Each exercise is instead rendered on the laptop by tools/render3d into 288×288 JPEG frames (2× the tile) plus a loop.mp4.
+  - **Playback (performance matters: the first 3D version was "almost not running" on the watch).** Opening a day used to request every frame of every exercise at once, so the exercise on screen starved behind ~185 downloads. Now:
+    - Video first: if `animVideo[id]`, play loop.mp4 muted inline. Support is unknown until tested, so while testing the frames play underneath (no stall either way); the first that actually advances wins, and the result is stored in localStorage `wp.video` ('1'/'0'). If the video has data but doesn't advance within 3 s (or 12 s total), the browser is marked as no-video.
+    - Frames: only the current exercise's `<img>`s are in the DOM. After they've all loaded, the rest of the day prefetches one exercise at a time, 2 requests in flight, without keeping Image objects (the HTTP cache holds them). Prefetch pauses whenever a new exercise is shown.
+    - `site/check.html` reports what a watch browser can do; ask the owner to open it when playback misbehaves.
   - Earlier attempts, don't repeat: hand-drawn SVG vector figures (sharp, but the owner found them too crude) and the raw 180px media (blurry).
   - Raster fallback: the animation sits directly on the black page because its white backdrop is pre-darkened (see below).
   - **No GIFs on the watch.** Some watch browsers only show a GIF's first frame. All frames `anim/<id>/<n>.png?v=<animV>` are stacked as `<img>`s in the square `.tile`, and `setTimeout` flips which one has `.on`, using the `plan.anim[id]` delays. A frame that hasn't loaded yet is waited for, not skipped.
@@ -65,8 +71,8 @@ plan.json:
   - The name sits below the animation, with "Day · n of N" underneath.
   - Segmented progress bar at the top.
   - Invisible tap zones: the left 34% goes to the previous exercise, the right 66% to the next. Swipe also works. On the first exercise, "previous" only nudges; the ‹ button leaves.
-  - Opening a day preloads every frame of that day's exercises (~370 KB per 3D exercise), so a dropped connection mid-workout still works.
-  - The tile is square, sized `60vh` and capped at 180px CSS (3D frames are 360px, so they're downscaled, never upscaled). `.name` is wrapped in a plain div because line-clamp breaks on flex items.
+  - The whole day is prefetched in the background (see Playback), so a dropped connection mid-workout still works.
+  - The tile is square, sized `60vh` and capped at 180px CSS (3D frames are 288px, so they're downscaled, never upscaled). `.name` is wrapped in a plain div because line-clamp breaks on flex items.
 - After the last exercise, a "<Day> done" screen appears, showing the next day (or the next week's first day after a week's last day). Taps within 600ms are ignored, and a tap after that returns home.
 - Old-WebKit safety: no flex `gap`, no `aspect-ratio`, no `fetch` (XHR), no arrow functions or `const`.
 - plan.json is fetched with a cache-busting query. The last good copy is cached in localStorage (`wp.plan`) as an offline fallback; home shows "Offline · saved plan" when that copy is in use. It refetches on `visibilitychange` while on the home screen.
@@ -78,7 +84,7 @@ plan.json:
 - Posing: `setHips(pos, bodyQ)`, `rotLocal(bone, x, y, z)`, `solveLimb()` analytic 2-bone IK with a pole (direction the elbow/knee points), `grip(side, point, palmNormal, pole)` (iterates so the palm lands on the point, wrist follows the forearm), `leg(side, ankle, pole, toeDir, up)`, `setHand`, `setFoot`. `palm(side)` = grip centre, where held equipment is placed.
 - Each EX[key]: `muscles` default, `cam: { dir, fov }` (auto-fit over the whole rep by `fitCamera`), `tl` timeline of [duration, from, to] segments with minimum-jerk easing (realistic tempo: slower lowering, pauses), `setup()` adds equipment to the scene, `fit()` returns objects the camera must include, `pose(p, t, dt)` with p = 0…1 through the rep, `setMuscle()` sets contraction for the glow.
 - Muscles are painted per vertex from the bind pose (bone segments + surface normal) and tinted in the material shader; intensity follows contraction. Names: chest abs lats traps lowerback delts biceps triceps forearms glutes quads hamstrings calves.
-- Output frames get a 10% black edge fade so the tile blends into the black page.
+- Output: 288 px JPEG (quality 0.8, rendered at 2× and downsampled) with a 10% black edge fade so the tile blends into the black page. `encodeLoop()` in render.mjs turns the frames into loop.mp4 (ffmpeg, H.264 baseline, CRF 24); it's skipped if ffmpeg isn't installed.
 - **Adding a movement:** add EX[key] in render.html, review it with the strip command, add the key to MOTIONS + RENDERED (+ a name rule) in motion-map.mjs. Bump RENDER_STYLE in render.mjs when changing anything that should re-render existing exercises.
 
 ## Raster fallback processing (admin Save)
@@ -118,7 +124,8 @@ plan.json:
     - A single tall sprite sheet animated but came out blurry, because watchOS downsampled it.
     - Per-frame images were still blurry on the device: the 180px source is simply too small for the watch.
   - Vector SVG animations (2026-11-24), replaced the same day: the owner found them too crude.
-  - Realistic 3D rendered animations (2026-11-24): 31 movements, covering all 30 plan exercises; other library exercises fall back to raster. Not yet tested on the device.
+  - Realistic 3D rendered animations (2026-11-24): 31 movements, covering all 30 plan exercises; other library exercises fall back to raster.
+    - First device test: very slow, almost not playing (all frames of the day requested at once). Fixed with smaller frames, video-first playback, priority loading and a gentle prefetch; not yet re-tested on the device.
   - UI polish pass (2026-11-24): admin has SVG icons, a watch-size switcher (41/45/49mm), `/` to focus search, a responsive layout, and keeps working when the dataset is missing
 - Not yet done:
   - Real-device test on an Apple Watch browser

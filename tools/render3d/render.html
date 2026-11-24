@@ -12,7 +12,7 @@ window.addEventListener('unhandledrejection', (ev) => { log('REJECT ' + (ev.reas
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
 // ---------------- renderer / scene ----------------
-const OUT = Number(Q.get('size') || 360), SS = 2;           // output px, supersampling
+const OUT = Number(Q.get('size') || 288), SS = 2;           // output px (2× the ~145 px watch tile), supersampling
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1); renderer.setSize(OUT * SS, OUT * SS);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -1062,7 +1062,7 @@ function fitCamera(ex) {
 // ---------------- render ----------------
 const out = document.createElement('canvas'); out.width = out.height = OUT;
 const octx = out.getContext('2d'); octx.imageSmoothingQuality = 'high';
-async function post(path, canvas, type = 'image/jpeg', q = 0.86) {
+async function post(path, canvas, type = 'image/jpeg', q = 0.8) {
   await fetch('/frame?path=' + encodeURIComponent(path), { method: 'POST', body: canvas.toDataURL(type, q) });
 }
 function frameAt(ex, cam, t, dt) {
