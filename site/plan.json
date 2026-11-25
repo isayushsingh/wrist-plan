@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-11-25T07:57:24.659Z",
+  "updatedAt": "2026-11-25T08:00:53.602Z",
   "attribution": "© Gym visual — https://gymvisual.com/",
   "weekAnchor": "2026-11-23",
   "customs": [
@@ -107,8 +107,8 @@
           "name": "Legs",
           "exercises": [
             {
-              "id": "0043",
-              "label": "Back Squat"
+              "id": "0750",
+              "label": "Smith Chair Squat"
             },
             {
               "id": "0739",
@@ -119,16 +119,24 @@
               "label": "Leg Extension"
             },
             {
-              "id": "0586",
-              "label": "Lying Leg Curl"
+              "id": "0599",
+              "label": "Lever Seated Leg Curl"
+            },
+            {
+              "id": "0597",
+              "label": "Lever Seated Hip Abduction"
             },
             {
               "id": "1459",
               "label": "DB Romanian Deadlift"
             },
             {
-              "id": "0088",
-              "label": "Seated Calf Raise"
+              "id": "1391",
+              "label": "Sled Calf Press On Leg Press"
+            },
+            {
+              "id": "0763",
+              "label": "Smith Reverse Calf Raises"
             }
           ]
         },
@@ -331,6 +339,7 @@
     }
   ],
   "img": {
+    "1391": "1391.jpg",
     "1399": "1399.png",
     "1451": "1451.png",
     "1459": "1459.jpg",
@@ -352,24 +361,29 @@
     "0120": "0120.jpg",
     "0767": "0767.jpg",
     "0406": "0406.jpg",
-    "0043": "0043.jpg",
     "0739": "0739.jpg",
     "0585": "0585.jpg",
-    "0586": "0586.jpg",
-    "0088": "0088.jpg",
+    "0206": "0206.jpg",
     "0070": "0070.jpg",
+    "0285": "0285.jpg",
+    "0201": "0201.jpg",
     "0060": "0060.jpg",
     "0310": "0310.jpg",
     "0203": "0203.jpg",
     "0472": "0472.jpg",
     "0687": "0687.jpg",
+    "0043": "0043.jpg",
+    "0586": "0586.jpg",
+    "0088": "0088.jpg",
     "0259": "0259.jpg",
     "0276": "0276.jpg",
-    "0206": "0206.jpg",
-    "0285": "0285.jpg",
-    "0201": "0201.jpg"
+    "0750": "0750.jpg",
+    "0599": "0599.jpg",
+    "0597": "0597.png",
+    "0763": "0763.png"
   },
   "imgVer": {
+    "1391": "mwvu3q1y",
     "1399": "mwvtz8z2",
     "1451": "mwvtz90j",
     "1459": "mwvsaphn",
@@ -391,21 +405,25 @@
     "0120": "mwvtjmy3",
     "0767": "mwvtjmy3",
     "0406": "mwvtjmy3",
-    "0043": "mwvsaphn",
     "0739": "mwvsaphn",
     "0585": "mwvsaphn",
-    "0586": "mwvsaphn",
-    "0088": "mwvsaphn",
+    "0206": "mwvtz8x3",
     "0070": "mwvsaphn",
+    "0285": "mwvtz8x3",
+    "0201": "mwvtz8x3",
     "0060": "mwvsaphn",
     "0310": "mwvsmofb",
     "0203": "mwvsaphn",
     "0472": "mwvsaphn",
     "0687": "mwvsaphn",
+    "0043": "mwvsaphn",
+    "0586": "mwvsaphn",
+    "0088": "mwvsaphn",
     "0259": "mwvsaphn",
     "0276": "mwvsaphn",
-    "0206": "mwvtz8x3",
-    "0285": "mwvtz8x3",
-    "0201": "mwvtz8x3"
+    "0750": "mwvu3q1y",
+    "0599": "mwvu3q1y",
+    "0597": "mwvu3q58",
+    "0763": "mwvu3q72"
   }
 }
