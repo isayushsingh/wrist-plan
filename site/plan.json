@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-11-25T07:20:45.500Z",
+  "updatedAt": "2026-11-25T07:31:47.908Z",
   "attribution": "© Gym visual — https://gymvisual.com/",
   "weekAnchor": "2026-11-23",
   "weeks": [
@@ -66,27 +66,27 @@
           "exercises": [
             {
               "id": "0405",
-              "label": "Seated DB Shoulder Press"
+              "label": "Dumbbell Seated Shoulder Press"
+            },
+            {
+              "id": "0326",
+              "label": "Dumbbell Incline Rear Lateral Raise"
             },
             {
               "id": "0334",
-              "label": "Lateral Raise"
+              "label": "Dumbbell Lateral Raise"
             },
             {
-              "id": "0310",
-              "label": "Front Raise"
+              "id": "0120",
+              "label": "Barbell Upright Row"
             },
             {
-              "id": "0203",
-              "label": "Rear Delt Rope Row"
+              "id": "0767",
+              "label": "Smith Shrug"
             },
             {
-              "id": "0472",
-              "label": "Hanging Leg Raise"
-            },
-            {
-              "id": "0687",
-              "label": "Russian Twist"
+              "id": "0406",
+              "label": "Dumbbell Shrug"
             }
           ]
         },
@@ -302,13 +302,11 @@
     "0313": "0313.jpg",
     "0025": "0025.jpg",
     "0314": "0314.jpg",
+    "0308": "0308.jpg",
     "0241": "0241.jpg",
+    "0194": "0194.jpg",
     "0405": "0405.jpg",
     "0334": "0334.jpg",
-    "0310": "0310.jpg",
-    "0203": "0203.jpg",
-    "0472": "0472.jpg",
-    "0687": "0687.jpg",
     "0043": "0043.jpg",
     "0739": "0739.jpg",
     "0585": "0585.jpg",
@@ -318,8 +316,14 @@
     "0060": "0060.jpg",
     "0259": "0259.jpg",
     "0276": "0276.jpg",
-    "0308": "0308.jpg",
-    "0194": "0194.jpg"
+    "0310": "0310.jpg",
+    "0203": "0203.jpg",
+    "0472": "0472.jpg",
+    "0687": "0687.jpg",
+    "0326": "0326.jpg",
+    "0120": "0120.png",
+    "0767": "0767.png",
+    "0406": "0406.png"
   },
   "imgVer": {
     "1459": "mwvsaphn",
@@ -330,13 +334,11 @@
     "0313": "mwvsaphn",
     "0025": "mwvsaphn",
     "0314": "mwvsaphn",
+    "0308": "mwvso3px",
     "0241": "mwvsaphn",
+    "0194": "mwvso3px",
     "0405": "mwvsaphn",
     "0334": "mwvsaphn",
-    "0310": "mwvsmofb",
-    "0203": "mwvsaphn",
-    "0472": "mwvsaphn",
-    "0687": "mwvsaphn",
     "0043": "mwvsaphn",
     "0739": "mwvsaphn",
     "0585": "mwvsaphn",
@@ -346,7 +348,13 @@
     "0060": "mwvsaphn",
     "0259": "mwvsaphn",
     "0276": "mwvsaphn",
-    "0308": "mwvso3px",
-    "0194": "mwvso3px"
+    "0310": "mwvsmofb",
+    "0203": "mwvsaphn",
+    "0472": "mwvsaphn",
+    "0687": "mwvsaphn",
+    "0326": "mwvt2af3",
+    "0120": "mwvt2ah7",
+    "0767": "mwvt2aj4",
+    "0406": "mwvt2akc"
   }
 }
