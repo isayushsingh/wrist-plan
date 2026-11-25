@@ -1085,7 +1085,7 @@ function frameAt(ex, cam, t, dt) {
 // modes:
 //   ?mode=strip&ex=<key>&n=6   one image with n stills across the rep (for reviewing a movement)
 //   ?mode=batch                 render every job in /jobs.json ([{ id, key, p: [muscles], s: [muscles] }])
-//                               to <id>/<n>.jpg, then POST a summary line per job
+//                               as one still <id>.jpg at the peak of the movement, then POST a summary line per job
 async function renderJob(key, mp, ms, onFrame) {
   const ex = EX[key];
   if (!ex) throw new Error('unknown movement ' + key);
@@ -1107,7 +1107,14 @@ async function renderJob(key, mp, ms, onFrame) {
     const jobs = await (await fetch('/jobs.json')).json();
     for (const job of jobs) {
       const r = await renderJob(job.key, job.p, job.s, async (ex, cam, { fps, N, dt }) => {
-        for (let i = 0; i < N; i++) { frameAt(ex, cam, i / fps, dt); await post(`${job.id}/${i}.jpg`, out); }
+        // one still at the peak of the movement: the middle of the stretch where contraction is highest
+        let best = 0; const lv = [];
+        for (let i = 0; i < N; i++) { resetPose(); ex.pose(ex.tl.at(i / fps), i / fps, dt); lv.push(MUSCLE.level); best = Math.max(best, MUSCLE.level); }
+        const peak = lv.map((v, i) => [v, i]).filter(([v]) => v >= best - 0.02).map(([, i]) => i);
+        const at = peak[Math.floor(peak.length / 2)];
+        for (let i = 0; i <= at; i++) { resetPose(); ex.pose(ex.tl.at(i / fps), i / fps, dt); }   // settle the springs up to it
+        frameAt(ex, cam, at / fps, dt);
+        await post(`${job.id}.jpg`, out, 'image/jpeg', 0.88);
       });
       await log(JSON.stringify({ id: job.id, key: job.key, frames: r.frames, fps: r.fps }));
     }

@@ -4,7 +4,7 @@
 //
 //   import { renderJobs } from './tools/render3d/render.mjs'
 //   await renderJobs([{ id: '0025', key: 'bench', p: ['chest'], s: ['triceps'] }], 'site/anim')
-//     → frames at site/anim/0025/0.jpg … ; resolves to { '0025': { frames, fps }, … }
+//     → site/anim/0025.jpg ; resolves to { '0025': { frames, fps }, … }
 //
 // CLI (preview strips for reviewing a movement):  node tools/render3d/render.mjs strip bench [outDir]
 import http from 'node:http';
@@ -18,7 +18,7 @@ import os from 'node:os';
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 export const MODEL = path.join(DIR, 'man.glb');
 // bump when render.html changes in a way that should re-render every animation
-export const RENDER_STYLE = 'r3d-v3';
+export const RENDER_STYLE = 'still-v1';
 
 const BROWSERS = [
   process.env.BROWSER,
@@ -79,23 +79,10 @@ function run(query, outDir, jobs, { onLog = () => {}, timeoutMs = 30 * 60 * 1000
   });
 }
 
-// Encode an exercise's frames (<dir>/0.jpg …) into a small looping MP4 (H.264 baseline, muted).
-// Watch browsers that play inline video use it (hardware-decoded, smooth); others fall back to the frames.
-// Resolves false when ffmpeg isn't installed.
-export function encodeLoop(dir, fps) {
-  const ffmpeg = ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'].find((f) => existsSync(f)) || 'ffmpeg';
-  return new Promise((resolve) => {
-    const p = spawn(ffmpeg, ['-y', '-loglevel', 'error', '-framerate', String(fps), '-i', path.join(dir, '%d.jpg'),
-      '-c:v', 'libx264', '-profile:v', 'baseline', '-level', '3.0', '-pix_fmt', 'yuv420p', '-crf', '24', '-g', String(fps * 2),
-      '-movflags', '+faststart', '-an', path.join(dir, 'loop.mp4')], { stdio: 'ignore' });
-    p.on('error', () => resolve(false));
-    p.on('exit', (code) => resolve(code === 0));
-  });
-}
-
+// Renders each job as one still image <outDir>/<id>.jpg (360×360, the peak of the movement).
 export function renderJobs(jobs, outDir, opts) {
   if (!jobs.length) return Promise.resolve({});
-  return run('mode=batch', outDir, jobs, opts);
+  return run('mode=batch&size=360', outDir, jobs, opts);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
