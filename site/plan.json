@@ -1,8 +1,15 @@
 {
   "version": 2,
-  "updatedAt": "2026-11-25T07:31:47.908Z",
+  "updatedAt": "2026-11-25T07:57:24.659Z",
   "attribution": "© Gym visual — https://gymvisual.com/",
   "weekAnchor": "2026-11-23",
+  "customs": [
+    {
+      "id": "c_face_pull",
+      "name": "Face Pull",
+      "mo": "face-pull"
+    }
+  ],
   "weeks": [
     {
       "id": "A",
@@ -87,6 +94,11 @@
             {
               "id": "0406",
               "label": "Dumbbell Shrug"
+            },
+            {
+              "id": "c_face_pull",
+              "label": "Face Pull",
+              "note": "Rope at face height. Pull to your forehead, elbows high, squeeze the rear delts."
             }
           ]
         },
@@ -125,24 +137,44 @@
           "name": "Arms & Core",
           "exercises": [
             {
-              "id": "0070",
-              "label": "Preacher Curl"
+              "id": "1630",
+              "label": "Cable Close Grip Curl"
             },
             {
-              "id": "0060",
-              "label": "Skull Crusher"
+              "id": "0206",
+              "label": "Cable Reverse Curl"
+            },
+            {
+              "id": "0070",
+              "label": "Preacher Curl"
             },
             {
               "id": "0313",
               "label": "Hammer Curl"
             },
             {
-              "id": "0259",
-              "label": "Close-Grip Push-Up"
+              "id": "0285",
+              "label": "Dumbbell Alternate Biceps Curl"
             },
             {
-              "id": "0276",
-              "label": "Dead Bug"
+              "id": "0201",
+              "label": "Cable Pushdown"
+            },
+            {
+              "id": "0060",
+              "label": "Barbell Lying Triceps Extension Skull Crusher"
+            },
+            {
+              "id": "1399",
+              "label": "Bench Dip On Floor"
+            },
+            {
+              "id": "0194",
+              "label": "Cable Overhead Triceps Extension (Rope Attachment)"
+            },
+            {
+              "id": "1451",
+              "label": "Lever Seated Dip"
             }
           ]
         }
@@ -225,6 +257,11 @@
               "label": "Rear Delt Rope Row"
             },
             {
+              "id": "c_face_pull",
+              "label": "Face Pull",
+              "note": "Rope at face height. Pull to your forehead, elbows high, squeeze the rear delts."
+            },
+            {
               "id": "0472",
               "label": "Hanging Leg Raise"
             },
@@ -294,7 +331,11 @@
     }
   ],
   "img": {
+    "1399": "1399.png",
+    "1451": "1451.png",
     "1459": "1459.jpg",
+    "1630": "1630.jpg",
+    "c_face_pull": "c_face_pull.jpg",
     "0150": "0150.jpg",
     "0861": "0861.jpg",
     "0293": "0293.jpg",
@@ -306,7 +347,11 @@
     "0241": "0241.jpg",
     "0194": "0194.jpg",
     "0405": "0405.jpg",
+    "0326": "0326.jpg",
     "0334": "0334.jpg",
+    "0120": "0120.jpg",
+    "0767": "0767.jpg",
+    "0406": "0406.jpg",
     "0043": "0043.jpg",
     "0739": "0739.jpg",
     "0585": "0585.jpg",
@@ -314,19 +359,22 @@
     "0088": "0088.jpg",
     "0070": "0070.jpg",
     "0060": "0060.jpg",
-    "0259": "0259.jpg",
-    "0276": "0276.jpg",
     "0310": "0310.jpg",
     "0203": "0203.jpg",
     "0472": "0472.jpg",
     "0687": "0687.jpg",
-    "0326": "0326.jpg",
-    "0120": "0120.png",
-    "0767": "0767.png",
-    "0406": "0406.png"
+    "0259": "0259.jpg",
+    "0276": "0276.jpg",
+    "0206": "0206.jpg",
+    "0285": "0285.jpg",
+    "0201": "0201.jpg"
   },
   "imgVer": {
+    "1399": "mwvtz8z2",
+    "1451": "mwvtz90j",
     "1459": "mwvsaphn",
+    "1630": "mwvtz8x3",
+    "c_face_pull": "mwvt4q0v",
     "0150": "mwvsaphn",
     "0861": "mwvsaphn",
     "0293": "mwvsaphn",
@@ -338,7 +386,11 @@
     "0241": "mwvsaphn",
     "0194": "mwvso3px",
     "0405": "mwvsaphn",
+    "0326": "mwvt2af3",
     "0334": "mwvsaphn",
+    "0120": "mwvtjmy3",
+    "0767": "mwvtjmy3",
+    "0406": "mwvtjmy3",
     "0043": "mwvsaphn",
     "0739": "mwvsaphn",
     "0585": "mwvsaphn",
@@ -346,15 +398,14 @@
     "0088": "mwvsaphn",
     "0070": "mwvsaphn",
     "0060": "mwvsaphn",
-    "0259": "mwvsaphn",
-    "0276": "mwvsaphn",
     "0310": "mwvsmofb",
     "0203": "mwvsaphn",
     "0472": "mwvsaphn",
     "0687": "mwvsaphn",
-    "0326": "mwvt2af3",
-    "0120": "mwvt2ah7",
-    "0767": "mwvt2aj4",
-    "0406": "mwvt2akc"
+    "0259": "mwvsaphn",
+    "0276": "mwvsaphn",
+    "0206": "mwvtz8x3",
+    "0285": "mwvtz8x3",
+    "0201": "mwvtz8x3"
   }
 }

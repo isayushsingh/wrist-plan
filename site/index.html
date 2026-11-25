@@ -124,6 +124,14 @@
   }
   .name.long { font-size: 6.8vw; }
   .meta { font-size: 4.8vw; color: var(--dim); margin-top: 1.4vw; }
+  /* optional tip from the admin: shown under the name; the image shrinks a little to make room */
+  .note {
+    display: none; font-size: 4.4vw; line-height: 1.25; color: var(--accent); margin-top: 1.6vw; padding: 0 2vw;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  #ex.no-note .note { display: none; }
+  #ex.has-note .tile { width: 46vh; height: 46vh; }
+  #ex.has-note .name { -webkit-line-clamp: 1; }
   .meta b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
 
   .in-next { -webkit-animation: inNext .24s ease-out; animation: inNext .24s ease-out; }
@@ -178,6 +186,7 @@
     <div class="info"><div><!-- wrapper keeps .name out of flex so line-clamp works -->
       <div class="name" id="name"></div>
       <div class="meta" id="meta"></div>
+      <div class="note" id="note"></div>
     </div></div>
   </div>
   <button class="zone prev" id="prevZone" aria-label="Previous exercise"></button>
@@ -340,6 +349,8 @@
   function renderEx(dir) {
     var x = day.exercises[idx];
     showImage(x.id); preloadNext();
+    $('note').textContent = x.note || '';
+    $('ex').classList.remove(x.note ? 'no-note' : 'has-note'); $('ex').classList.add(x.note ? 'has-note' : 'no-note');
     var label = x.label || x.id;
     $('name').textContent = label;
     $('name').className = 'name' + (label.length > 22 ? ' long' : '');
