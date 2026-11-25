@@ -106,7 +106,7 @@ plan.json:
 - Done:
   - Admin portal: search, filters, add/rename/reorder/delete, live preview, Save and Publish
   - Watch page
-  - Sample 6-day plan: Push / Legs / Pull / Push Volume / Legs & Core / Arms. It's placeholder data; the owner will replace it with his trainer's list.
+  - Plan: 5-day split, same in both weeks: Pull (back, biceps) / Push (chest, triceps) / Shoulders & Core / Legs / Arms & Core (2026-11-25). Legs only once a week. Exercises are a starting point; the owner may swap in his trainer's list.
   - Git repo (github.com/isayushsingh/wrist-plan) and Vercel deploy
   - Two alternating weeks (2026-11-24)
   - Black-backdrop animations as JS-stepped per-frame PNGs (2026-11-24)

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-11-25T07:10:13.396Z",
+  "updatedAt": "2026-11-25T07:20:45.500Z",
   "attribution": "© Gym visual — https://gymvisual.com/",
   "weekAnchor": "2026-11-23",
   "weeks": [
@@ -8,6 +8,32 @@
       "id": "A",
       "name": "Week A",
       "days": [
+        {
+          "id": "pull",
+          "name": "Pull",
+          "exercises": [
+            {
+              "id": "0150",
+              "label": "Lat Pulldown"
+            },
+            {
+              "id": "0861",
+              "label": "Seated Cable Row"
+            },
+            {
+              "id": "0293",
+              "label": "DB Bent-Over Row"
+            },
+            {
+              "id": "0294",
+              "label": "Dumbbell Curl"
+            },
+            {
+              "id": "0313",
+              "label": "Hammer Curl"
+            }
+          ]
+        },
         {
           "id": "push",
           "name": "Push",
@@ -21,6 +47,24 @@
               "label": "Incline DB Press"
             },
             {
+              "id": "0308",
+              "label": "Dumbbell Fly"
+            },
+            {
+              "id": "0241",
+              "label": "Triceps Pushdown"
+            },
+            {
+              "id": "0194",
+              "label": "Overhead Rope Extension"
+            }
+          ]
+        },
+        {
+          "id": "shoulders",
+          "name": "Shoulders & Core",
+          "exercises": [
+            {
               "id": "0405",
               "label": "Seated DB Shoulder Press"
             },
@@ -29,8 +73,20 @@
               "label": "Lateral Raise"
             },
             {
-              "id": "0241",
-              "label": "Triceps Pushdown"
+              "id": "0310",
+              "label": "Front Raise"
+            },
+            {
+              "id": "0203",
+              "label": "Rear Delt Rope Row"
+            },
+            {
+              "id": "0472",
+              "label": "Hanging Leg Raise"
+            },
+            {
+              "id": "0687",
+              "label": "Russian Twist"
             }
           ]
         },
@@ -55,13 +111,49 @@
               "label": "Lying Leg Curl"
             },
             {
+              "id": "1459",
+              "label": "DB Romanian Deadlift"
+            },
+            {
               "id": "0088",
               "label": "Seated Calf Raise"
             }
           ]
         },
         {
-          "id": "pull",
+          "id": "arms",
+          "name": "Arms & Core",
+          "exercises": [
+            {
+              "id": "0070",
+              "label": "Preacher Curl"
+            },
+            {
+              "id": "0060",
+              "label": "Skull Crusher"
+            },
+            {
+              "id": "0313",
+              "label": "Hammer Curl"
+            },
+            {
+              "id": "0259",
+              "label": "Close-Grip Push-Up"
+            },
+            {
+              "id": "0276",
+              "label": "Dead Bug"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "name": "Week B",
+      "days": [
+        {
+          "id": "bpull",
           "name": "Pull",
           "exercises": [
             {
@@ -77,8 +169,8 @@
               "label": "DB Bent-Over Row"
             },
             {
-              "id": "0203",
-              "label": "Rear Delt Rope Row"
+              "id": "0294",
+              "label": "Dumbbell Curl"
             },
             {
               "id": "0313",
@@ -86,90 +178,6 @@
             }
           ]
         },
-        {
-          "id": "push2",
-          "name": "Push Volume",
-          "exercises": [
-            {
-              "id": "0577",
-              "label": "Machine Chest Press"
-            },
-            {
-              "id": "0308",
-              "label": "Dumbbell Fly"
-            },
-            {
-              "id": "2137",
-              "label": "Arnold Press"
-            },
-            {
-              "id": "1270",
-              "label": "Upper Chest Crossover"
-            },
-            {
-              "id": "0194",
-              "label": "Overhead Rope Extension"
-            }
-          ]
-        },
-        {
-          "id": "legs2",
-          "name": "Legs & Core",
-          "exercises": [
-            {
-              "id": "1459",
-              "label": "DB Romanian Deadlift"
-            },
-            {
-              "id": "1460",
-              "label": "Walking Lunge"
-            },
-            {
-              "id": "1409",
-              "label": "Barbell Glute Bridge"
-            },
-            {
-              "id": "0472",
-              "label": "Hanging Leg Raise"
-            },
-            {
-              "id": "0276",
-              "label": "Dead Bug"
-            }
-          ]
-        },
-        {
-          "id": "arms",
-          "name": "Arms",
-          "exercises": [
-            {
-              "id": "0294",
-              "label": "Dumbbell Curl"
-            },
-            {
-              "id": "0070",
-              "label": "Preacher Curl"
-            },
-            {
-              "id": "0060",
-              "label": "Skull Crusher"
-            },
-            {
-              "id": "0259",
-              "label": "Close-Grip Push-Up"
-            },
-            {
-              "id": "0687",
-              "label": "Russian Twist"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "B",
-      "name": "Week B",
-      "days": [
         {
           "id": "bpush",
           "name": "Push",
@@ -183,6 +191,24 @@
               "label": "Incline DB Press"
             },
             {
+              "id": "0308",
+              "label": "Dumbbell Fly"
+            },
+            {
+              "id": "0241",
+              "label": "Triceps Pushdown"
+            },
+            {
+              "id": "0194",
+              "label": "Overhead Rope Extension"
+            }
+          ]
+        },
+        {
+          "id": "bshoulders",
+          "name": "Shoulders & Core",
+          "exercises": [
+            {
               "id": "0405",
               "label": "Seated DB Shoulder Press"
             },
@@ -191,8 +217,20 @@
               "label": "Lateral Raise"
             },
             {
-              "id": "0241",
-              "label": "Triceps Pushdown"
+              "id": "0310",
+              "label": "Front Raise"
+            },
+            {
+              "id": "0203",
+              "label": "Rear Delt Rope Row"
+            },
+            {
+              "id": "0472",
+              "label": "Hanging Leg Raise"
+            },
+            {
+              "id": "0687",
+              "label": "Russian Twist"
             }
           ]
         },
@@ -217,97 +255,19 @@
               "label": "Lying Leg Curl"
             },
             {
+              "id": "1459",
+              "label": "DB Romanian Deadlift"
+            },
+            {
               "id": "0088",
               "label": "Seated Calf Raise"
             }
           ]
         },
         {
-          "id": "bpull",
-          "name": "Pull",
-          "exercises": [
-            {
-              "id": "0150",
-              "label": "Lat Pulldown"
-            },
-            {
-              "id": "0861",
-              "label": "Seated Cable Row"
-            },
-            {
-              "id": "0293",
-              "label": "DB Bent-Over Row"
-            },
-            {
-              "id": "0203",
-              "label": "Rear Delt Rope Row"
-            },
-            {
-              "id": "0313",
-              "label": "Hammer Curl"
-            }
-          ]
-        },
-        {
-          "id": "bpush2",
-          "name": "Push Volume",
-          "exercises": [
-            {
-              "id": "0577",
-              "label": "Machine Chest Press"
-            },
-            {
-              "id": "0308",
-              "label": "Dumbbell Fly"
-            },
-            {
-              "id": "2137",
-              "label": "Arnold Press"
-            },
-            {
-              "id": "1270",
-              "label": "Upper Chest Crossover"
-            },
-            {
-              "id": "0194",
-              "label": "Overhead Rope Extension"
-            }
-          ]
-        },
-        {
-          "id": "blegs2",
-          "name": "Legs & Core",
-          "exercises": [
-            {
-              "id": "1459",
-              "label": "DB Romanian Deadlift"
-            },
-            {
-              "id": "1460",
-              "label": "Walking Lunge"
-            },
-            {
-              "id": "1409",
-              "label": "Barbell Glute Bridge"
-            },
-            {
-              "id": "0472",
-              "label": "Hanging Leg Raise"
-            },
-            {
-              "id": "0276",
-              "label": "Dead Bug"
-            }
-          ]
-        },
-        {
           "id": "barms",
-          "name": "Arms",
+          "name": "Arms & Core",
           "exercises": [
-            {
-              "id": "0294",
-              "label": "Dumbbell Curl"
-            },
             {
               "id": "0070",
               "label": "Preacher Curl"
@@ -317,12 +277,16 @@
               "label": "Skull Crusher"
             },
             {
+              "id": "0313",
+              "label": "Hammer Curl"
+            },
+            {
               "id": "0259",
               "label": "Close-Grip Push-Up"
             },
             {
-              "id": "0687",
-              "label": "Russian Twist"
+              "id": "0276",
+              "label": "Dead Bug"
             }
           ]
         }
@@ -330,67 +294,59 @@
     }
   ],
   "img": {
-    "1270": "1270.jpg",
-    "1409": "1409.jpg",
     "1459": "1459.jpg",
-    "1460": "1460.jpg",
-    "2137": "2137.jpg",
+    "0150": "0150.jpg",
+    "0861": "0861.jpg",
+    "0293": "0293.jpg",
+    "0294": "0294.jpg",
+    "0313": "0313.jpg",
     "0025": "0025.jpg",
     "0314": "0314.jpg",
+    "0241": "0241.jpg",
     "0405": "0405.jpg",
     "0334": "0334.jpg",
-    "0241": "0241.jpg",
+    "0310": "0310.jpg",
+    "0203": "0203.jpg",
+    "0472": "0472.jpg",
+    "0687": "0687.jpg",
     "0043": "0043.jpg",
     "0739": "0739.jpg",
     "0585": "0585.jpg",
     "0586": "0586.jpg",
     "0088": "0088.jpg",
-    "0150": "0150.jpg",
-    "0861": "0861.jpg",
-    "0293": "0293.jpg",
-    "0203": "0203.jpg",
-    "0313": "0313.jpg",
-    "0577": "0577.jpg",
-    "0308": "0308.jpg",
-    "0194": "0194.jpg",
-    "0472": "0472.jpg",
-    "0276": "0276.jpg",
-    "0294": "0294.jpg",
     "0070": "0070.jpg",
     "0060": "0060.jpg",
     "0259": "0259.jpg",
-    "0687": "0687.jpg"
+    "0276": "0276.jpg",
+    "0308": "0308.jpg",
+    "0194": "0194.jpg"
   },
   "imgVer": {
-    "1270": "mwvsaphn",
-    "1409": "mwvsaphn",
     "1459": "mwvsaphn",
-    "1460": "mwvsaphn",
-    "2137": "mwvsaphn",
+    "0150": "mwvsaphn",
+    "0861": "mwvsaphn",
+    "0293": "mwvsaphn",
+    "0294": "mwvsaphn",
+    "0313": "mwvsaphn",
     "0025": "mwvsaphn",
     "0314": "mwvsaphn",
+    "0241": "mwvsaphn",
     "0405": "mwvsaphn",
     "0334": "mwvsaphn",
-    "0241": "mwvsaphn",
+    "0310": "mwvsmofb",
+    "0203": "mwvsaphn",
+    "0472": "mwvsaphn",
+    "0687": "mwvsaphn",
     "0043": "mwvsaphn",
     "0739": "mwvsaphn",
     "0585": "mwvsaphn",
     "0586": "mwvsaphn",
     "0088": "mwvsaphn",
-    "0150": "mwvsaphn",
-    "0861": "mwvsaphn",
-    "0293": "mwvsaphn",
-    "0203": "mwvsaphn",
-    "0313": "mwvsaphn",
-    "0577": "mwvsaphn",
-    "0308": "mwvsaphn",
-    "0194": "mwvsaphn",
-    "0472": "mwvsaphn",
-    "0276": "mwvsaphn",
-    "0294": "mwvsaphn",
     "0070": "mwvsaphn",
     "0060": "mwvsaphn",
     "0259": "mwvsaphn",
-    "0687": "mwvsaphn"
+    "0276": "mwvsaphn",
+    "0308": "mwvso3px",
+    "0194": "mwvso3px"
   }
 }
