@@ -34,6 +34,8 @@ WristPlan runs as a static web page opened in a watch browser, so it needs no Ap
 
 - **Exercise library.** Search 1,324 exercises and filter them by equipment and muscle.
 - **Plan builder.** Build days for each week, rename exercises to match the trainer's wording, and reorder them by dragging.
+- **Custom exercises.** Add anything missing from the library (for example, a face pull) by giving it a name and choosing the 3D movement that illustrates it.
+- **Tips.** Attach a short note to any exercise, such as a form cue, and it appears under the name on the watch.
 - **Live watch preview.** See the result at 41, 45 or 49 mm sizes before publishing.
 - **One-click publish.** *Save & Publish* renders any new images, commits the site and pushes it, and Vercel redeploys automatically.
 
@@ -97,7 +99,8 @@ Neither download is committed to the repository or deployed.
 1. **Choose a week.** Use the Week A / Week B tabs at the top left. Double-click a tab to rename it. *Make this week* sets which week the watch treats as current.
 2. **Add days.** Click **+ Add day**, then name the day (for example, *Push*).
 3. **Add exercises.** Search the library on the right and click an exercise to add it to the selected day. Hover over a card to preview the original illustration.
-4. **Adjust the list.** Rename an exercise to match the trainer's wording, reorder by dragging or with the arrows, and remove with ✕.
+4. **Adjust the list.** Rename an exercise to match the trainer's wording, reorder by dragging or with the arrows, and remove with ✕. Type a tip in **Add a tip for the watch** to show it under the exercise name (up to 140 characters).
+   - Can't find an exercise? Click **＋ Custom** above the library, enter a name, and pick the 3D movement used for its image. It is added to the day and saved under **My exercises** for reuse.
 5. **Choose the image (optional).** Each exercise is matched to a 3D movement automatically. Use the menu on the exercise row to pick a different movement, or *Original illustration* to use the dataset's version.
 6. **Save** (⌘S) to write the plan and render new images, or **Save & Publish** to deploy as well.
 
@@ -118,7 +121,7 @@ The renderer in `tools/render3d/` is a three.js scene that runs in a headless br
 - **Muscle highlights:** painted onto the mesh from the dataset's primary and secondary muscles.
 - **Output:** a 360 × 360 JPEG of about 11 KB, twice the size of the watch tile, so it is always downscaled and stays sharp.
 
-Images are cached by movement, muscles and renderer version, and only new or changed exercises are rendered. There are 31 movements, covering presses, raises, curls, extensions, rows, pulldowns, squats, lunges, hinges, leg machines and core work.
+Images are cached by movement, muscles and renderer version, and only new or changed exercises are rendered. There are 36 movements, covering presses, raises, shrugs, upright rows, curls, extensions, rows, face pulls, pulldowns, squats, lunges, hinges, leg machines and core work.
 
 ### Original illustrations (fallback)
 
@@ -169,7 +172,7 @@ Watch browsers run limited versions of WebKit, so `site/index.html` avoids moder
 
 - The movements are hand-choreographed with realistic timing; they are not motion capture.
 - Hands form a closed grip, so the thumbs do not wrap around bars, and push-ups are shown on the knuckles.
-- Exercises outside the 31 movements fall back to the dataset's lower-resolution original illustration.
+- Exercises outside the 36 movements fall back to the dataset's lower-resolution original illustration.
 - Rendering requires Brave or Chrome and an internet connection on the laptop.
 
 ## Credits and licensing

@@ -91,8 +91,21 @@ function thisMonday() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const CUSTOM_ID = /^c_[a-z0-9_]{1,40}$/;
+
 function validatePlan(plan) {
   if (!plan) throw new Error('empty plan');
+  // custom exercises (not in the dataset): { id: 'c_…', name, mo: 3D movement key that draws its image }
+  const customs = [], customById = new Map();
+  for (const c of Array.isArray(plan.customs) ? plan.customs.slice(0, 200) : []) {
+    const id = String(c.id || ''), name = String(c.name || '').trim().slice(0, 40), mo = String(c.mo || '');
+    if (!CUSTOM_ID.test(id)) throw new Error(`Bad custom exercise id: ${id}`);
+    if (!name) throw new Error('A custom exercise needs a name');
+    if (!RENDERED.has(mo)) throw new Error(`Custom exercise "${name}" needs a 3D movement for its image`);
+    if (customById.has(id)) continue;
+    const def = { id, name, mo };
+    customs.push(def); customById.set(id, def);
+  }
   // v1 plans had a single `days` list: treat it as one week
   const weeksIn = Array.isArray(plan.weeks) ? plan.weeks
     : Array.isArray(plan.days) ? [{ id: 'A', name: 'Week A', days: plan.days }] : null;
@@ -113,11 +126,14 @@ function validatePlan(plan) {
           id,
           name: String(d.name || `Day ${i + 1}`).slice(0, 40),
           exercises: d.exercises.map((x) => {
-            const xid = String(x.id);
-            if (!/^\d{4}$/.test(xid) || !gifById.has(xid)) throw new Error(`Unknown exercise id: ${xid}`);
-            const out = { id: xid, label: String(x.label || '').slice(0, 60) };
-            // optional animation override: a movement key, or 'gif' for the original animation
-            if (x.mo === 'gif' || MOTIONS[x.mo]) out.mo = x.mo;
+            const xid = String(x.id), custom = customById.get(xid);
+            if (!custom && (!/^\d{4}$/.test(xid) || !gifById.has(xid))) throw new Error(`Unknown exercise id: ${xid}`);
+            const out = { id: xid, label: String(x.label || (custom && custom.name) || '').slice(0, 60) };
+            // optional image override: a 3D movement key, or 'gif' for the original illustration (dataset only)
+            if ((x.mo === 'gif' && !custom) || RENDERED.has(x.mo)) out.mo = x.mo;
+            // optional short tip shown under the name on the watch
+            const note = String(x.note || '').replace(/\s+/g, ' ').trim().slice(0, 140);
+            if (note) out.note = note;
             return out;
           }),
         };
@@ -125,7 +141,7 @@ function validatePlan(plan) {
     };
   });
   const anchor = /^\d{4}-\d{2}-\d{2}$/.test(plan.weekAnchor || '') ? plan.weekAnchor : thisMonday();
-  return { version: 2, updatedAt: new Date().toISOString(), attribution: ATTRIBUTION, weekAnchor: anchor, weeks };
+  return { version: 2, updatedAt: new Date().toISOString(), attribution: ATTRIBUTION, weekAnchor: anchor, customs, weeks };
 }
 
 // Each exercise is shown on the watch as ONE still image in site/anim/ (animations proved too slow on
@@ -139,9 +155,11 @@ const META = path.join(ANIM, 'meta.json');
 
 // what the watch shows for each plan exercise: { id: { kind: '3d', key } | { kind: 'raster' } }
 function imagePlan(plan) {
-  const out = {};
+  const out = {}, customs = new Map((plan.customs || []).map((c) => [c.id, c]));
+  for (const c of customs.values()) out[c.id] = { kind: '3d', key: c.mo };   // so the library can show them
   for (const w of plan.weeks) for (const d of w.days) for (const x of d.exercises) {
-    const key = x.mo === 'gif' ? null : (x.mo || motionById.get(x.id)?.m);
+    const c = customs.get(x.id);
+    const key = c ? (RENDERED.has(x.mo) ? x.mo : c.mo) : x.mo === 'gif' ? null : (x.mo || motionById.get(x.id)?.m);
     out[x.id] = key && RENDERED.has(key) ? { kind: '3d', key } : { kind: 'raster' };
   }
   return out;

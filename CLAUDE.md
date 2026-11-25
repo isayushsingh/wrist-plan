@@ -35,13 +35,16 @@ plan.json:
 ```json
 { "version": 2, "updatedAt": "ISO", "attribution": "© Gym visual — https://gymvisual.com/",
   "weekAnchor": "2026-11-23",
+  "customs": [ { "id": "c_face_pull", "name": "Face Pull", "mo": "face-pull" } ],
   "weeks": [
-    { "id": "A", "name": "Week A", "days": [ { "id": "push", "name": "Push", "exercises": [ { "id": "0025", "label": "Bench Press", "mo": "bench" } ] } ] },
+    { "id": "A", "name": "Week A", "days": [ { "id": "push", "name": "Push", "exercises": [ { "id": "0025", "label": "Bench Press", "mo": "bench", "note": "Tip shown on the watch" } ] } ] },
     { "id": "B", "name": "Week B", "days": [ ... ] } ] }
 ```
 - **Alternating weeks:** the weeks rotate A, B, A, B, … every Monday, continuously, not reset per month. `weekAnchor` is a Monday on which `weeks[0]` starts, and current week = `floor(daysSince(anchor) / 7) mod weeks.length` in local time. The admin's "Make this week" button rewrites the anchor. The server accepts 1–4 weeks; the admin UI assumes two.
 - Day ids must be unique across all weeks, because `wp.lastDay` stores one. The server de-dupes them.
 - v1 plans (a top-level `days` array) are still accepted everywhere. The admin migrates one on load into Week A plus a copy as Week B; the watch treats it as a single week.
+- **Custom exercises** (not in the dataset): defined once in `customs` (`id` = `c_` + slug, `name`, `mo` = a RENDERED movement that draws its image) and used in days by that id. They always get a 3D image (rendered even when unused, so the admin library can show it) and have no "original illustration". The admin's library shows them under "My exercises" (＋ Custom to create, ✕ to delete everywhere).
+- **Notes:** any exercise entry may carry `note` (≤140 chars, whitespace collapsed by the server). The watch shows it in lime under the name, 3 lines max, and shrinks the image tile to 46vh to make room (`#ex.has-note`).
 - `id` is the 4-digit dataset id. `label` is the display name shown on the watch. `mo` (optional) overrides the image: a 3D movement key, or `"gif"` for the original illustration.
 - Written by Save: `img` (id → file under anim/, e.g. `0025.jpg`) and `imgVer` (id → cache tag; images are served with a 1-week max-age).
 - Dataset `data/exercises.json` is an array of objects with `id, name, target, body_part, equipment, image (180px jpg), gif_url (180px gif)`. Some names contain the mojibake `в°`, which `cleanName()` turns into `°`.
@@ -71,7 +74,7 @@ plan.json:
 ## 3D renderer (tools/render3d)
 - Character: CC0 "Man Base Mesh" (T-shirt + shorts, 24 bones: Hips → Spine02 → Spine01 → Spine → neck → Head; Left/Right Shoulder, Arm, ForeArm, Hand; UpLeg, Leg, Foot, ToeBase). Metres, faces +Z, character's left = +X. No finger bones.
 - `curlFingers()` bends the hand mesh into a grip (three joints per finger, thumb outside the finger span curls less) using each vertex's real skinning matrix. Never read `.array` of skin attributes directly: they're interleaved, use getX/getY/getZ/getW.
-- Posing: `setHips(pos, bodyQ)`, `rotLocal(bone, x, y, z)`, `solveLimb()` analytic 2-bone IK with a pole (direction the elbow/knee points), `grip(side, point, palmNormal, pole)` (iterates so the palm lands on the point, wrist follows the forearm), `leg(side, ankle, pole, toeDir, up)`, `setHand`, `setFoot`. `palm(side)` = grip centre, where held equipment is placed.
+- Posing: `setHips(pos, bodyQ)`, `rotLocal(bone, x, y, z)`, `rotWorld(bone, axis, angle)`, `shrugUp(angle)` (raises both collarbones; ~0.5 rad for a full shrug), `solveLimb()` analytic 2-bone IK with a pole (direction the elbow/knee points), `grip(side, point, palmNormal, pole)` (iterates so the palm lands on the point, wrist follows the forearm), `leg(side, ankle, pole, toeDir, up)`, `setHand`, `setFoot`. `palm(side)` = grip centre, where held equipment is placed.
 - Each EX[key]: `muscles` default, `cam: { dir, fov }` (auto-fit over the whole rep by `fitCamera`), `tl` timeline of [duration, from, to] segments with minimum-jerk easing (realistic tempo: slower lowering, pauses), `setup()` adds equipment to the scene, `fit()` returns objects the camera must include, `pose(p, t, dt)` with p = 0…1 through the rep, `setMuscle()` sets contraction for the glow.
 - Muscles are painted per vertex from the bind pose (bone segments + surface normal) and tinted in the material shader; intensity follows contraction. Names: chest abs lats traps lowerback delts biceps triceps forearms glutes quads hamstrings calves.
 - Output: batch mode renders ONE still per exercise, 360 px JPEG (quality 0.88, rendered at 2× and downsampled), at the middle of the stretch where contraction (`setMuscle`) is highest, with a 10% black edge fade so the tile blends into the black page. The rep timelines still exist because they define the pose and the peak.
@@ -106,6 +109,8 @@ plan.json:
 - Done:
   - Admin portal: search, filters, add/rename/reorder/delete, live preview, Save and Publish
   - Watch page
+  - 3D shrug (dumbbell / barbell / Smith machine, viewed from behind so the traps show) and upright row (2026-11-25); every plan exercise now has a 3D image.
+  - Custom exercises + per-exercise notes (2026-11-25), with a new 3D Face Pull movement (`face-pull`; the dataset has no face pull).
   - Plan: 5-day split, same in both weeks: Pull (back, biceps) / Push (chest, triceps) / Shoulders & Core / Legs / Arms & Core (2026-11-25). Legs only once a week. Exercises are a starting point; the owner may swap in his trainer's list.
   - Git repo (github.com/isayushsingh/wrist-plan) and Vercel deploy
   - Two alternating weeks (2026-11-24)

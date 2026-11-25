@@ -142,6 +142,22 @@
   .exrow .label:hover { border-color: var(--line); background: transparent; }
   .exrow .label:focus { background: var(--raise); border-color: var(--accent); }
   .tags { display: flex; gap: 6px; padding: 3px 8px 0; min-width: 0; overflow: hidden; }
+  .exrow .note { width: 100%; margin-top: 5px; background: transparent; border: 1px dashed transparent; padding: 4px 8px; font-size: 12px; color: var(--dim); border-radius: 7px; }
+  .exrow .note::placeholder { color: var(--faint); }
+  .exrow .note:hover { border-color: var(--line); background: transparent; }
+  .exrow .note:focus { border-style: solid; border-color: var(--accent); background: var(--raise); color: var(--fg); }
+  .exrow .note.has { color: var(--accent); }
+  .tag.custom { color: var(--accent-ink); background: var(--accent); }
+  .btn.small { padding: 5px 10px; font-size: 12px; }
+  .cform { margin: 0 16px 12px; padding: 12px; border: 1px solid var(--line-hi); border-radius: var(--r); background: var(--panel); display: grid; gap: 8px; }
+  .cform[hidden] { display: none; }
+  .cform .row { display: flex; gap: 8px; justify-content: flex-end; }
+  .cform small { color: var(--faint); font-size: 11px; line-height: 1.4; }
+  .libhead { grid-column: 1 / -1; font-size: 11px; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); padding: 2px 2px 0; }
+  .card img.r3d { background: #000; object-fit: cover; }
+  .card .del { position: absolute; top: 7px; left: 7px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,.7); color: var(--dim); display: grid; place-items: center; opacity: 0; transition: opacity .15s; }
+  .card:hover .del { opacity: 1; }
+  .card .del:hover { color: var(--danger); }
   .anim { flex: none; font-size: 12px; padding: 5px 26px 5px 9px; border-radius: 8px; max-width: 168px; background-position: right 9px center; text-transform: none; }
   .anim.vec { color: var(--accent); border-color: rgba(199,244,100,.3); }
   .tag { font-size: 11px; color: var(--dim); background: var(--raise); border-radius: 6px; padding: 1px 7px; white-space: nowrap; }
@@ -260,7 +276,13 @@
 
   <!-- library -->
   <section>
-    <div class="head"><h2>Exercise library</h2></div>
+    <div class="head"><h2>Exercise library</h2><button class="btn small" id="addCustom" title="Add an exercise that isn't in the library">＋ Custom</button></div>
+    <div class="cform" id="cform" hidden>
+      <input id="cName" placeholder="Exercise name, e.g. Face Pull" maxlength="40" spellcheck="false">
+      <select id="cMo"></select>
+      <small>The image on the watch is a 3D render of the movement you pick.</small>
+      <div class="row"><button class="btn small" id="cCancel">Cancel</button><button class="btn small primary" id="cAdd">Add to day</button></div>
+    </div>
     <div class="search">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input id="q" placeholder="Search exercises, e.g. lat pulldown" spellcheck="false" autocomplete="off">
@@ -318,8 +340,11 @@ function normalize(p) {
   // two alternating weeks; a new Week B starts as a copy of A so the watch is never empty
   if (p.weeks.length < 2) p.weeks.push({ id: 'B', name: 'Week B', days: cloneDays(p.weeks[0].days) });
   if (!p.weekAnchor) p.weekAnchor = ymd(mondayOf());
+  if (!Array.isArray(p.customs)) p.customs = [];
   return p;
 }
+const customOf = (id) => plan.customs.find((c) => c.id === id);
+const imgUrl = (id) => `/preview/anim/${id}.jpg?v=${(plan.imgVer && plan.imgVer[id]) || ''}`;
 function cloneDays(days) { return days.map((d) => ({ id: uid(), name: d.name, exercises: d.exercises.map((x) => ({ ...x })) })); }
 function renderWeeks() {
   const cur = currentWeek(), tabs = $('weekTabs'); tabs.innerHTML = '';
@@ -410,19 +435,22 @@ function renderEditor() {
   }
   if (!d.exercises.length) { box.innerHTML = `<div class="empty">${ICON.dumbbell}<b>Empty day</b><br>Pick exercises from the library →</div>`; return; }
   d.exercises.forEach((x, i) => {
-    const e = BY_ID.get(x.id);
+    const e = BY_ID.get(x.id), cu = customOf(x.id);
     const r = document.createElement('div');
     r.className = 'exrow'; r.draggable = true;
-    const tags = e
+    const tags = cu
+      ? `<span class="tag custom">Custom</span><span class="tag">${esc(MOTIONS[cu.mo] || cu.mo)}</span>`
+      : e
       ? `<span class="tag">${esc(e.equipment)}</span><span class="tag">${esc(e.target)}</span><span class="tag src" title="${esc(e.name)}">${esc(e.name)}</span>`
       : `<span class="tag src">${libError ? 'Library not loaded' : 'Unknown id ' + esc(x.id)}</span>`;
     r.innerHTML = `
       <span class="grip" title="Drag to reorder">${ICON.grip}</span>
       <span class="ord">${i + 1}</span>
-      <img class="thumb" src="${e ? '/dataset/' + e.image : '/preview/anim/' + x.id + '/0.png'}" alt="" loading="lazy">
+      <img class="thumb" src="${e ? '/dataset/' + e.image : imgUrl(x.id)}" alt="" loading="lazy" ${cu ? 'style="background:#000;object-fit:cover"' : ''}>
       <div class="info">
-        <input class="label" value="${esc(x.label)}" placeholder="${esc(e ? pretty(e.name) : x.id)}" maxlength="60" spellcheck="false">
+        <input class="label" value="${esc(x.label)}" placeholder="${esc(cu ? cu.name : e ? pretty(e.name) : x.id)}" maxlength="60" spellcheck="false">
         <div class="tags">${tags}</div>
+        <input class="note${x.note ? ' has' : ''}" value="${esc(x.note || '')}" placeholder="＋ Add a tip for the watch (optional)" maxlength="140" spellcheck="true">
       </div>
       <select class="anim" title="Image on the watch: a rendered 3D still of a movement, or the original illustration"></select>
       <div class="actions">
@@ -436,11 +464,14 @@ function renderEditor() {
       r.onmouseleave = () => { img.src = '/dataset/' + e.image; };
     }
     r.querySelector('.label').oninput = (ev) => { x.label = ev.target.value; setDirty(); };
+    const noteEl = r.querySelector('.note');
+    noteEl.oninput = () => { const v = noteEl.value; if (v.trim()) x.note = v; else delete x.note; noteEl.classList.toggle('has', !!v.trim()); setDirty(); };
+    noteEl.onkeydown = (ev) => { if (ev.key === 'Enter') noteEl.blur(); };
     // animation picker: auto-matched vector movement, a specific movement, or the original animation
-    const sel_ = r.querySelector('.anim'), auto = e && e.motion;
+    const sel_ = r.querySelector('.anim'), auto = cu ? cu.mo : e && e.motion;
     sel_.add(new Option(`Auto · ${auto && MOTIONS[auto] ? '3D ' + MOTIONS[auto] : 'Original'}`, ''));
     Object.entries(MOTIONS).sort((a, b) => a[1].localeCompare(b[1])).forEach(([k, v]) => sel_.add(new Option(v, k)));
-    sel_.add(new Option('Original illustration', 'gif'));
+    if (!cu) sel_.add(new Option('Original illustration', 'gif'));       // custom exercises have no illustration
     sel_.value = x.mo || '';
     const paint = () => sel_.classList.toggle('vec', x.mo ? x.mo !== 'gif' : !!(auto && MOTIONS[auto]));
     paint();
@@ -476,8 +507,26 @@ function renderLib() {
   $('clearF').hidden = !(eq || tg || $('q').value);
   const list = filtered();
   const inDay = new Set((D()[sel]?.exercises || []).map((x) => x.id));
-  $('libCount').textContent = `${list.length.toLocaleString()} result${list.length === 1 ? '' : 's'} · hover to animate`;
-  if (!list.length) { g.innerHTML = '<div class="libmsg">No matches.<br>Try fewer words or clear the filters.</div>'; return; }
+  // your custom exercises first (search by name; hidden while an equipment/muscle filter is set)
+  const words = $('q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const mine = eq || tg ? [] : plan.customs.filter((c) => words.every((w) => (c.name + ' ' + (MOTIONS[c.mo] || '')).toLowerCase().includes(w)));
+  $('libCount').textContent = `${(list.length + mine.length).toLocaleString()} result${list.length + mine.length === 1 ? '' : 's'} · hover to animate`;
+  if (mine.length) {
+    g.insertAdjacentHTML('beforeend', '<div class="libhead">My exercises</div>');
+    mine.forEach((cu) => {
+      const c = document.createElement('div');
+      c.className = 'card'; c.tabIndex = 0; c.title = `Add “${cu.name}”`;
+      c.innerHTML = `<img class="r3d" src="${imgUrl(cu.id)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+        <div class="cn">${esc(cu.name)}</div><div class="cm">Custom · ${esc(MOTIONS[cu.mo] || cu.mo)}</div>
+        <span class="add">${ICON.plus}</span><button class="del" title="Delete this custom exercise">${ICON.x}</button>${inDay.has(cu.id) ? `<span class="in" style="left:36px">${ICON.check}In day</span>` : ''}`;
+      c.onclick = () => addCustomEx(cu);
+      c.onkeydown = (ev) => { if (ev.key === 'Enter') addCustomEx(cu); };
+      c.querySelector('.del').onclick = (ev) => { ev.stopPropagation(); deleteCustom(cu); };
+      g.appendChild(c);
+    });
+    if (list.length) g.insertAdjacentHTML('beforeend', '<div class="libhead">Library</div>');
+  }
+  if (!list.length && !mine.length) { g.innerHTML = '<div class="libmsg">No matches.<br>Try fewer words or clear the filters, or add it with <b>＋ Custom</b>.</div>'; return; }
   list.slice(0, shown).forEach((e) => {
     const c = document.createElement('button');
     c.className = 'card';
@@ -498,6 +547,49 @@ function renderLib() {
     g.appendChild(m);
   }
 }
+// ---------- custom exercises ----------
+function addCustomEx(cu) {
+  if (!D().length) { D().push({ id: uid(), name: 'Day 1', exercises: [] }); sel = 0; }
+  const d = D()[sel];
+  d.exercises.push({ id: cu.id, label: cu.name });
+  setDirty(); renderAll();
+  toast(`Added “${cu.name}” to ${d.name || 'this day'}`);
+  requestAnimationFrame(() => { const l = $('exList'); l.scrollTop = l.scrollHeight; });
+}
+function deleteCustom(cu) {
+  const uses = plan.weeks.reduce((n, w) => n + w.days.reduce((m, d) => m + d.exercises.filter((x) => x.id === cu.id).length, 0), 0);
+  if (!confirm(`Delete “${cu.name}”${uses ? ` and remove it from ${plural(uses, 'day')}` : ''}?`)) return;
+  plan.customs = plan.customs.filter((c) => c !== cu);
+  for (const w of plan.weeks) for (const d of w.days) d.exercises = d.exercises.filter((x) => x.id !== cu.id);
+  setDirty(); renderAll();
+}
+function openCustomForm(open) {
+  $('cform').hidden = !open;
+  if (!open) return;
+  const s = $('cMo'); s.innerHTML = '';
+  s.add(new Option('Pick the movement for its image…', ''));
+  Object.entries(MOTIONS).sort((a, b) => a[1].localeCompare(b[1])).forEach(([k, v]) => s.add(new Option(v, k)));
+  $('cName').value = $('q').value.trim().replace(/\b\w/g, (c) => c.toUpperCase());
+  $('cName').focus();
+}
+function createCustom() {
+  const name = $('cName').value.trim(), mo = $('cMo').value;
+  if (!name) { $('cName').focus(); return toast('Give the exercise a name', { err: true }); }
+  if (!mo) { $('cMo').focus(); return toast('Pick a movement for its image', { err: true }); }
+  const base = 'c_' + (name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 30) || 'exercise');
+  let id = base, n = 2;
+  while (plan.customs.some((c) => c.id === id)) id = `${base}_${n++}`;
+  const cu = { id, name, mo };
+  plan.customs.push(cu);
+  openCustomForm(false);
+  addCustomEx(cu);
+  toast(`Created “${name}”. Save to render its image.`);
+}
+$('addCustom').onclick = () => openCustomForm($('cform').hidden);
+$('cCancel').onclick = () => openCustomForm(false);
+$('cAdd').onclick = createCustom;
+$('cName').onkeydown = (ev) => { if (ev.key === 'Enter') createCustom(); if (ev.key === 'Escape') openCustomForm(false); };
+
 function addEx(e) {
   if (!D().length) { D().push({ id: uid(), name: 'Day 1', exercises: [] }); sel = 0; }
   const d = D()[sel];
@@ -566,6 +658,8 @@ async function save() {
     const { ok, j } = await api('/api/plan', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(plan) });
     if (!ok) { setDirty(true); toast('Save failed: ' + j.error, { err: true }); return false; }
     plan.updatedAt = j.updatedAt; setDirty(false);
+    // pick up the new image versions (e.g. a custom exercise's first render)
+    try { const fr = await api('/api/plan'); if (fr.ok) { plan.img = fr.j.img; plan.imgVer = fr.j.imgVer; renderAll(); } } catch {}
     $('preview').contentWindow.location.reload();
     const g = j.gifs;
     toast(`Saved · ${plural(g.total, 'image')}${g.rendered ? ` · rendered ${g.rendered} in 3D (${j.seconds} s)` : ''}`);

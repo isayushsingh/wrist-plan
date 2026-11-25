@@ -11,7 +11,8 @@ export const MOTIONS = {
   legext: 'Leg extension', legcurl: 'Leg curl', legpress: 'Leg press',
   calfseated: 'Seated calf raise', calfstand: 'Standing calf raise',
   pulldown: 'Lat pulldown', pullup: 'Pull-up', cablerow: 'Seated cable row', row: 'Bent-over row',
-  facepull: 'Rear-delt row', shrug: 'Shrug',
+  facepull: 'Rear-delt row', 'face-pull': 'Face pull', shrug: 'Shrug (dumbbells)', 'shrug-bb': 'Shrug (barbell)',
+  'shrug-smith': 'Shrug (Smith machine)', 'upright-row': 'Upright row',
   rdl: 'Romanian deadlift', deadlift: 'Deadlift', squat: 'Squat (barbell)', 'squat-front': 'Squat',
   lunge: 'Lunge', bridge: 'Glute bridge',
   hangraise: 'Hanging leg raise', crunch: 'Crunch', deadbug: 'Dead bug', twist: 'Russian twist',
@@ -33,11 +34,13 @@ const RULES = [
   [/squat/, (n, eq) => (eq === 'bb' ? 'squat' : 'squat-front')],
   [/pulldown|pull-down|pull down/, 'pulldown'],
   [/pull[- ]?up|chin[- ]?up|muscle up/, 'pullup'],
-  [/face pull|rear delt|reverse fly|rear lateral/, 'facepull'],
-  [/upright row/, 'shrug'],
+  [/face pull/, 'face-pull'],
+  [/rear delt|reverse fly|rear lateral/, 'facepull'],
+  [/upright row/, 'upright-row'],
   [/(seated|cable|machine|lever|low).*row|row.*(seated|cable|machine)/, 'cablerow'],
   [/row/, 'row'],
-  [/shrug/, 'shrug'],
+  [/smith.*shrug|shrug.*smith/, 'shrug-smith'],
+  [/shrug/, (n, eq) => (eq === 'bb' ? 'shrug-bb' : 'shrug')],
   [/skull|lying.*(triceps|tricep) extension|lying extension/, 'skull'],
   [/push ?down|press ?down/, 'pushdown'],
   [/overhead.*(triceps|extension)|triceps extension|tricep extension|french press|kickback/, 'ohext'],
@@ -77,7 +80,7 @@ function equipmentKey(eq) {
 // movements with a 3D render (EX in tools/render3d/render.html)
 export const RENDERED = new Set(['bench', 'bench-incline', 'chestpress', 'ohp', 'arnold', 'lateral', 'frontraise', 'fly',
   'crossover-up', 'pushdown', 'ohext', 'skull', 'curl', 'curl-hammer', 'preacher', 'legext', 'legcurl', 'legpress',
-  'calfseated', 'pulldown', 'cablerow', 'row', 'facepull', 'rdl', 'squat', 'lunge', 'bridge', 'hangraise', 'deadbug',
+  'calfseated', 'pulldown', 'cablerow', 'row', 'facepull', 'face-pull', 'shrug', 'shrug-bb', 'shrug-smith', 'upright-row', 'rdl', 'squat', 'lunge', 'bridge', 'hangraise', 'deadbug',
   'pushup', 'twist']);
 
 export function motionFor(name, equipment) {
