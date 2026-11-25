@@ -47,6 +47,8 @@ plan.json:
 - **Notes:** any exercise entry may carry `note` (≤140 chars, whitespace collapsed by the server). The watch shows it in lime under the name, 3 lines max, and shrinks the image tile to 46vh to make room (`#ex.has-note`).
 - `id` is the 4-digit dataset id. `label` is the display name shown on the watch. `mo` (optional) overrides the image: a 3D movement key, or `"gif"` for the original illustration.
 - Written by Save: `img` (id → file under anim/, e.g. `0025.jpg`) and `imgVer` (id → cache tag; images are served with a 1-week max-age).
+- Also written by Save: `src` on every exercise entry (`anim/<file>?v=<imgVer>`, the same path `imgSrc()` builds). It exists for WristBridge, whose `site/watch.json` templates can't look up `img[id]`. `validatePlan()` drops any incoming `src`, and `addImageSrc()` recomputes it.
+- `site/watch.json`: WristBridge descriptor (native Apple Watch app via server-driven UI). Screens: weeks → day → exercise (image, name, note).
 - Dataset `data/exercises.json` is an array of objects with `id, name, target, body_part, equipment, image (180px jpg), gif_url (180px gif)`. Some names contain the mojibake `в°`, which `cleanName()` turns into `°`.
 
 ## Admin server API

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-11-25T08:00:53.602Z",
+  "updatedAt": "2026-11-25T08:29:07.853Z",
   "attribution": "© Gym visual — https://gymvisual.com/",
   "weekAnchor": "2026-11-23",
   "customs": [
@@ -21,23 +21,28 @@
           "exercises": [
             {
               "id": "0150",
-              "label": "Lat Pulldown"
+              "label": "Lat Pulldown",
+              "src": "anim/0150.jpg?v=mwvsaphn"
             },
             {
               "id": "0861",
-              "label": "Seated Cable Row"
+              "label": "Seated Cable Row",
+              "src": "anim/0861.jpg?v=mwvsaphn"
             },
             {
               "id": "0293",
-              "label": "DB Bent-Over Row"
+              "label": "DB Bent-Over Row",
+              "src": "anim/0293.jpg?v=mwvsaphn"
             },
             {
               "id": "0294",
-              "label": "Dumbbell Curl"
+              "label": "Dumbbell Curl",
+              "src": "anim/0294.jpg?v=mwvsaphn"
             },
             {
               "id": "0313",
-              "label": "Hammer Curl"
+              "label": "Hammer Curl",
+              "src": "anim/0313.jpg?v=mwvsaphn"
             }
           ]
         },
@@ -47,23 +52,28 @@
           "exercises": [
             {
               "id": "0025",
-              "label": "Bench Press"
+              "label": "Bench Press",
+              "src": "anim/0025.jpg?v=mwvsaphn"
             },
             {
               "id": "0314",
-              "label": "Incline DB Press"
+              "label": "Incline DB Press",
+              "src": "anim/0314.jpg?v=mwvsaphn"
             },
             {
               "id": "0308",
-              "label": "Dumbbell Fly"
+              "label": "Dumbbell Fly",
+              "src": "anim/0308.jpg?v=mwvso3px"
             },
             {
               "id": "0241",
-              "label": "Triceps Pushdown"
+              "label": "Triceps Pushdown",
+              "src": "anim/0241.jpg?v=mwvsaphn"
             },
             {
               "id": "0194",
-              "label": "Overhead Rope Extension"
+              "label": "Overhead Rope Extension",
+              "src": "anim/0194.jpg?v=mwvso3px"
             }
           ]
         },
@@ -73,32 +83,39 @@
           "exercises": [
             {
               "id": "0405",
-              "label": "Dumbbell Seated Shoulder Press"
+              "label": "Dumbbell Seated Shoulder Press",
+              "src": "anim/0405.jpg?v=mwvsaphn"
             },
             {
               "id": "0326",
-              "label": "Dumbbell Incline Rear Lateral Raise"
+              "label": "Dumbbell Incline Rear Lateral Raise",
+              "src": "anim/0326.jpg?v=mwvt2af3"
             },
             {
               "id": "0334",
-              "label": "Dumbbell Lateral Raise"
+              "label": "Dumbbell Lateral Raise",
+              "src": "anim/0334.jpg?v=mwvsaphn"
             },
             {
               "id": "0120",
-              "label": "Barbell Upright Row"
+              "label": "Barbell Upright Row",
+              "src": "anim/0120.jpg?v=mwvtjmy3"
             },
             {
               "id": "0767",
-              "label": "Smith Shrug"
+              "label": "Smith Shrug",
+              "src": "anim/0767.jpg?v=mwvtjmy3"
             },
             {
               "id": "0406",
-              "label": "Dumbbell Shrug"
+              "label": "Dumbbell Shrug",
+              "src": "anim/0406.jpg?v=mwvtjmy3"
             },
             {
               "id": "c_face_pull",
               "label": "Face Pull",
-              "note": "Rope at face height. Pull to your forehead, elbows high, squeeze the rear delts."
+              "note": "Rope at face height. Pull to your forehead, elbows high, squeeze the rear delts.",
+              "src": "anim/c_face_pull.jpg?v=mwvt4q0v"
             }
           ]
         },
@@ -108,35 +125,43 @@
           "exercises": [
             {
               "id": "0750",
-              "label": "Smith Chair Squat"
+              "label": "Smith Chair Squat",
+              "src": "anim/0750.jpg?v=mwvu3q1y"
             },
             {
               "id": "0739",
-              "label": "Leg Press"
+              "label": "Leg Press",
+              "src": "anim/0739.jpg?v=mwvsaphn"
             },
             {
               "id": "0585",
-              "label": "Leg Extension"
+              "label": "Leg Extension",
+              "src": "anim/0585.jpg?v=mwvsaphn"
             },
             {
               "id": "0599",
-              "label": "Lever Seated Leg Curl"
+              "label": "Lever Seated Leg Curl",
+              "src": "anim/0599.jpg?v=mwvu3q1y"
             },
             {
               "id": "0597",
-              "label": "Lever Seated Hip Abduction"
+              "label": "Lever Seated Hip Abduction",
+              "src": "anim/0597.png?v=mwvu3q58"
             },
             {
               "id": "1459",
-              "label": "DB Romanian Deadlift"
+              "label": "DB Romanian Deadlift",
+              "src": "anim/1459.jpg?v=mwvsaphn"
             },
             {
               "id": "1391",
-              "label": "Sled Calf Press On Leg Press"
+              "label": "Sled Calf Press On Leg Press",
+              "src": "anim/1391.jpg?v=mwvu3q1y"
             },
             {
               "id": "0763",
-              "label": "Smith Reverse Calf Raises"
+              "label": "Smith Reverse Calf Raises",
+              "src": "anim/0763.png?v=mwvu3q72"
             }
           ]
         },
@@ -146,43 +171,53 @@
           "exercises": [
             {
               "id": "1630",
-              "label": "Cable Close Grip Curl"
+              "label": "Cable Close Grip Curl",
+              "src": "anim/1630.jpg?v=mwvtz8x3"
             },
             {
               "id": "0206",
-              "label": "Cable Reverse Curl"
+              "label": "Cable Reverse Curl",
+              "src": "anim/0206.jpg?v=mwvtz8x3"
             },
             {
               "id": "0070",
-              "label": "Preacher Curl"
+              "label": "Preacher Curl",
+              "src": "anim/0070.jpg?v=mwvsaphn"
             },
             {
               "id": "0313",
-              "label": "Hammer Curl"
+              "label": "Hammer Curl",
+              "src": "anim/0313.jpg?v=mwvsaphn"
             },
             {
               "id": "0285",
-              "label": "Dumbbell Alternate Biceps Curl"
+              "label": "Dumbbell Alternate Biceps Curl",
+              "src": "anim/0285.jpg?v=mwvtz8x3"
             },
             {
               "id": "0201",
-              "label": "Cable Pushdown"
+              "label": "Cable Pushdown",
+              "src": "anim/0201.jpg?v=mwvtz8x3"
             },
             {
               "id": "0060",
-              "label": "Barbell Lying Triceps Extension Skull Crusher"
+              "label": "Barbell Lying Triceps Extension Skull Crusher",
+              "src": "anim/0060.jpg?v=mwvsaphn"
             },
             {
               "id": "1399",
-              "label": "Bench Dip On Floor"
+              "label": "Bench Dip On Floor",
+              "src": "anim/1399.png?v=mwvtz8z2"
             },
             {
               "id": "0194",
-              "label": "Cable Overhead Triceps Extension (Rope Attachment)"
+              "label": "Cable Overhead Triceps Extension (Rope Attachment)",
+              "src": "anim/0194.jpg?v=mwvso3px"
             },
             {
               "id": "1451",
-              "label": "Lever Seated Dip"
+              "label": "Lever Seated Dip",
+              "src": "anim/1451.png?v=mwvtz90j"
             }
           ]
         }
@@ -198,23 +233,28 @@
           "exercises": [
             {
               "id": "0150",
-              "label": "Lat Pulldown"
+              "label": "Lat Pulldown",
+              "src": "anim/0150.jpg?v=mwvsaphn"
             },
             {
               "id": "0861",
-              "label": "Seated Cable Row"
+              "label": "Seated Cable Row",
+              "src": "anim/0861.jpg?v=mwvsaphn"
             },
             {
               "id": "0293",
-              "label": "DB Bent-Over Row"
+              "label": "DB Bent-Over Row",
+              "src": "anim/0293.jpg?v=mwvsaphn"
             },
             {
               "id": "0294",
-              "label": "Dumbbell Curl"
+              "label": "Dumbbell Curl",
+              "src": "anim/0294.jpg?v=mwvsaphn"
             },
             {
               "id": "0313",
-              "label": "Hammer Curl"
+              "label": "Hammer Curl",
+              "src": "anim/0313.jpg?v=mwvsaphn"
             }
           ]
         },
@@ -224,23 +264,28 @@
           "exercises": [
             {
               "id": "0025",
-              "label": "Bench Press"
+              "label": "Bench Press",
+              "src": "anim/0025.jpg?v=mwvsaphn"
             },
             {
               "id": "0314",
-              "label": "Incline DB Press"
+              "label": "Incline DB Press",
+              "src": "anim/0314.jpg?v=mwvsaphn"
             },
             {
               "id": "0308",
-              "label": "Dumbbell Fly"
+              "label": "Dumbbell Fly",
+              "src": "anim/0308.jpg?v=mwvso3px"
             },
             {
               "id": "0241",
-              "label": "Triceps Pushdown"
+              "label": "Triceps Pushdown",
+              "src": "anim/0241.jpg?v=mwvsaphn"
             },
             {
               "id": "0194",
-              "label": "Overhead Rope Extension"
+              "label": "Overhead Rope Extension",
+              "src": "anim/0194.jpg?v=mwvso3px"
             }
           ]
         },
@@ -250,32 +295,39 @@
           "exercises": [
             {
               "id": "0405",
-              "label": "Seated DB Shoulder Press"
+              "label": "Seated DB Shoulder Press",
+              "src": "anim/0405.jpg?v=mwvsaphn"
             },
             {
               "id": "0334",
-              "label": "Lateral Raise"
+              "label": "Lateral Raise",
+              "src": "anim/0334.jpg?v=mwvsaphn"
             },
             {
               "id": "0310",
-              "label": "Front Raise"
+              "label": "Front Raise",
+              "src": "anim/0310.jpg?v=mwvsmofb"
             },
             {
               "id": "0203",
-              "label": "Rear Delt Rope Row"
+              "label": "Rear Delt Rope Row",
+              "src": "anim/0203.jpg?v=mwvsaphn"
             },
             {
               "id": "c_face_pull",
               "label": "Face Pull",
-              "note": "Rope at face height. Pull to your forehead, elbows high, squeeze the rear delts."
+              "note": "Rope at face height. Pull to your forehead, elbows high, squeeze the rear delts.",
+              "src": "anim/c_face_pull.jpg?v=mwvt4q0v"
             },
             {
               "id": "0472",
-              "label": "Hanging Leg Raise"
+              "label": "Hanging Leg Raise",
+              "src": "anim/0472.jpg?v=mwvsaphn"
             },
             {
               "id": "0687",
-              "label": "Russian Twist"
+              "label": "Russian Twist",
+              "src": "anim/0687.jpg?v=mwvsaphn"
             }
           ]
         },
@@ -285,27 +337,33 @@
           "exercises": [
             {
               "id": "0043",
-              "label": "Back Squat"
+              "label": "Back Squat",
+              "src": "anim/0043.jpg?v=mwvsaphn"
             },
             {
               "id": "0739",
-              "label": "Leg Press"
+              "label": "Leg Press",
+              "src": "anim/0739.jpg?v=mwvsaphn"
             },
             {
               "id": "0585",
-              "label": "Leg Extension"
+              "label": "Leg Extension",
+              "src": "anim/0585.jpg?v=mwvsaphn"
             },
             {
               "id": "0586",
-              "label": "Lying Leg Curl"
+              "label": "Lying Leg Curl",
+              "src": "anim/0586.jpg?v=mwvsaphn"
             },
             {
               "id": "1459",
-              "label": "DB Romanian Deadlift"
+              "label": "DB Romanian Deadlift",
+              "src": "anim/1459.jpg?v=mwvsaphn"
             },
             {
               "id": "0088",
-              "label": "Seated Calf Raise"
+              "label": "Seated Calf Raise",
+              "src": "anim/0088.jpg?v=mwvsaphn"
             }
           ]
         },
@@ -315,23 +373,28 @@
           "exercises": [
             {
               "id": "0070",
-              "label": "Preacher Curl"
+              "label": "Preacher Curl",
+              "src": "anim/0070.jpg?v=mwvsaphn"
             },
             {
               "id": "0060",
-              "label": "Skull Crusher"
+              "label": "Skull Crusher",
+              "src": "anim/0060.jpg?v=mwvsaphn"
             },
             {
               "id": "0313",
-              "label": "Hammer Curl"
+              "label": "Hammer Curl",
+              "src": "anim/0313.jpg?v=mwvsaphn"
             },
             {
               "id": "0259",
-              "label": "Close-Grip Push-Up"
+              "label": "Close-Grip Push-Up",
+              "src": "anim/0259.jpg?v=mwvsaphn"
             },
             {
               "id": "0276",
-              "label": "Dead Bug"
+              "label": "Dead Bug",
+              "src": "anim/0276.jpg?v=mwvsaphn"
             }
           ]
         }
@@ -361,8 +424,10 @@
     "0120": "0120.jpg",
     "0767": "0767.jpg",
     "0406": "0406.jpg",
+    "0750": "0750.jpg",
     "0739": "0739.jpg",
     "0585": "0585.jpg",
+    "0599": "0599.jpg",
     "0206": "0206.jpg",
     "0070": "0070.jpg",
     "0285": "0285.jpg",
@@ -377,8 +442,6 @@
     "0088": "0088.jpg",
     "0259": "0259.jpg",
     "0276": "0276.jpg",
-    "0750": "0750.jpg",
-    "0599": "0599.jpg",
     "0597": "0597.png",
     "0763": "0763.png"
   },
@@ -405,8 +468,10 @@
     "0120": "mwvtjmy3",
     "0767": "mwvtjmy3",
     "0406": "mwvtjmy3",
+    "0750": "mwvu3q1y",
     "0739": "mwvsaphn",
     "0585": "mwvsaphn",
+    "0599": "mwvu3q1y",
     "0206": "mwvtz8x3",
     "0070": "mwvsaphn",
     "0285": "mwvtz8x3",
@@ -421,8 +486,6 @@
     "0088": "mwvsaphn",
     "0259": "mwvsaphn",
     "0276": "mwvsaphn",
-    "0750": "mwvu3q1y",
-    "0599": "mwvu3q1y",
     "0597": "mwvu3q58",
     "0763": "mwvu3q72"
   }

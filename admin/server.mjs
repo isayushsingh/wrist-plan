@@ -214,6 +214,16 @@ async function syncImages(plan, onProgress = () => {}) {
   return { rendered, removed, total: Object.keys(want).length, img, imgVer };
 }
 
+// Copy each exercise's image path onto the exercise itself (`src`, the same value imgSrc() builds in
+// site/index.html). WristBridge's watch.json templates can't look up plan.img[id], only plain fields.
+// validatePlan() rebuilds every exercise, so a stale `src` sent back by the admin is always dropped.
+function addImageSrc(plan) {
+  for (const w of plan.weeks) for (const d of w.days) for (const x of d.exercises) {
+    const f = plan.img[x.id], v = plan.imgVer[x.id];
+    if (f) x.src = 'anim/' + f + (v ? '?v=' + encodeURIComponent(v) : '');
+  }
+}
+
 const git = (args) => new Promise((resolve) => {
   execFile('git', args, { cwd: ROOT }, (err, stdout, stderr) =>
     resolve({ ok: !err, out: (stdout + stderr).trim() }));
@@ -246,6 +256,7 @@ const server = http.createServer(async (req, res) => {
       const { img, imgVer, ...gifs } = await syncImages(plan, (m) => console.log('  ' + m));
       plan.img = img;           // { id: '<id>.jpg' (3D still) | '<id>.png' (original, first frame) } under anim/
       plan.imgVer = imgVer;     // { id: cache tag } — images are served with a 1-week max-age
+      addImageSrc(plan);
       await writeFile(PLAN, JSON.stringify(plan, null, 2) + '\n');
       return send(res, 200, { ok: true, updatedAt: plan.updatedAt, gifs, seconds: Math.round((Date.now() - t0) / 1000) });
     }

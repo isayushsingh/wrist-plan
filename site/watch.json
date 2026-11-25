@@ -1,0 +1,99 @@
+{
+  "watchVersion": "1",
+  "name": "WristPlan",
+  "entry": "weeks",
+  "screens": {
+    "weeks": {
+      "title": "WristPlan",
+      "tint": "#C7F464",
+      "ttl": 300,
+      "source": { "url": "/plan.json" },
+      "template": [
+        {
+          "$repeat": "data.weeks",
+          "$as": "w",
+          "type": "section",
+          "title": "{{w.name}}",
+          "children": [
+            {
+              "$repeat": "w.days",
+              "$as": "d",
+              "type": "row",
+              "title": "{{d.name}}",
+              "value": "{{d.exercises | len}}",
+              "icon": "figure.strengthtraining.traditional",
+              "action": { "type": "navigate", "screen": "day", "params": { "day": "{{d.id}}" } }
+            }
+          ]
+        }
+      ]
+    },
+    "day": {
+      "title": "Workout",
+      "tint": "#C7F464",
+      "ttl": 300,
+      "source": { "url": "/plan.json" },
+      "template": [
+        {
+          "$repeat": "data.weeks",
+          "$as": "w",
+          "type": "stack",
+          "children": [
+            {
+              "$repeat": "w.days",
+              "$as": "d",
+              "$if": "d.id | eq:params.day",
+              "type": "section",
+              "title": "{{d.name}} · {{w.name}}",
+              "children": [
+                {
+                  "$repeat": "d.exercises",
+                  "$as": "ex",
+                  "type": "row",
+                  "title": "{{ex.label}}",
+                  "subtitle": "{{ex.note | default:''}}",
+                  "action": { "type": "navigate", "screen": "exercise", "params": { "day": "{{d.id}}", "i": "{{index}}" } }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "exercise": {
+      "title": "Exercise",
+      "tint": "#C7F464",
+      "ttl": 300,
+      "source": { "url": "/plan.json" },
+      "template": [
+        {
+          "$repeat": "data.weeks",
+          "$as": "w",
+          "type": "stack",
+          "children": [
+            {
+              "$repeat": "w.days",
+              "$as": "d",
+              "$if": "d.id | eq:params.day",
+              "type": "stack",
+              "children": [
+                {
+                  "$repeat": "d.exercises",
+                  "$as": "ex",
+                  "$if": "index | eq:params.i",
+                  "type": "stack",
+                  "spacing": 6,
+                  "children": [
+                    { "$if": "ex.src", "type": "image", "url": "{{ex.src}}", "alt": "{{ex.label}}", "height": 130 },
+                    { "type": "text", "text": "{{ex.label}}", "style": "headline", "align": "center" },
+                    { "$if": "ex.note", "type": "text", "text": "{{ex.note}}", "style": "footnote", "color": "#C7F464", "align": "center", "lines": 3 }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
